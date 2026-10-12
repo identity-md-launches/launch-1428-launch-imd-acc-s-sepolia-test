@@ -6,13 +6,10 @@
 (() => {
   'use strict';
 
-  // --- Constants & Addresses ---
-  const CURRENT_BLOCK = 11891109;
-  const DATA_BLOCK_TEXT = `Data at block ${CURRENT_BLOCK.toLocaleString()}`;
-
+  // --- Constants & Addresses (Sepolia test run 4) ---
   const ADDRESSES = {
     SEPOLIA_CHAIN_ID: '0xaa36a7', // 11155111
-    STACKER: '0x0457276d7b036818b3eddc1a4a3fceda61e9314d',
+    STACKER: '0x0457276d7b036818b3eddc1a4a3fceda61e9314d', // test run 2, launch #1294
     PROJECT_REGISTRY: '0xfe4470a42df0e77f7efb1b2e8135134a9cd7d102', // test run 4, launch #1378
     REGISTRY_RUN3: '0x9b466d1527322435dc7fdd97bc862b49c177fc2d', // launch #1371
     REGISTRY_RUN2: '0x3a3bfcb65614292b0ec7c62f9e3a5dac003b920e', // launch #1294, rules v1
@@ -26,65 +23,65 @@
     ROBINHOOD_IMD: '0x5f7bb59365ce557c26dbcaa4ee9d39a4b95b7127'
   };
 
+  // Blocks the live contracts were deployed at: reads start here.
+  const DEPLOY_BLOCK = { STACKER: 11891109, REGISTRY: 11897725 };
+
+  // Public Sepolia RPCs (all allow browser calls); tried in order.
+  const RPC_URLS = [
+    'https://ethereum-sepolia-rpc.publicnode.com',
+    'https://rpc.sepolia.ethpandaops.io',
+    'https://sepolia.drpc.org'
+  ];
+
+  const SEL = {
+    credit: '0xef6506db', // credit(address,uint256)
+    faucet: '0xde5f72fd',
+    approve: '0x095ea7b3',
+    allowance: '0xdd62ed3e',
+    balanceOf: '0x70a08231',
+    convertToAssets: '0x07a2d13a',
+    paused: '0x5c975abb',
+    mint: '0x40c10f19',
+    ORACLE_FEE: '0x31d8a985',
+    challengeBond: '0x52305151',
+    challengeCooldown: '0x55631f9c',
+    projectOf: '0x176309b7',
+    applyListing: '0x4f604d26', // applyListing(address,string,string,uint16,address)
+    challengeForBeneficiary: '0x55b2aebb', // challengeForBeneficiary(address,string,address)
+    applyQuestion: '0x7cb9ece7',
+    bondOwed: '0x8af92a6d',
+    claimBond: '0x0f022812',
+    expire: '0xc8db233e'
+  };
+
+  const TOPIC = {
+    Stacked: '0x7fbd7b0bc9aac1aa6f42ea64666fad17288ea759411a11f4231a958bc31838c6',
+    Applied: '0xb7e8095de4cf7043336c1e0ece05439714eb277c7cb5deed1b4f2479e4a6d173',
+    Listed: '0x518fc40ea95a380fb5f45f1ad72398fdefb809c6dfebc59d2236045bd1d10267',
+    Rejected: '0xf8a1bb90febbb3cd262033228521e367e8bba1bc6c61eee6bcfa744fafb31f4a',
+    Challenged: '0x43993779a041d6ad7d4dceb299983e61e87565d974db929ff04933734959cd0e',
+    Defended: '0x42d2c8660fea33f766be7cfab644ef179a97c26621566727cbcb6ae7986963a9',
+    Delisted: '0x0f4e3ebc43292a7ecf57e30d244481c276bb21cb84f14905ce5786ddcfe2908a',
+    AskCleared: '0x479ec138af9f4c82591accadecba9be18b659e2389b0629555e011f33a6b97d4',
+    BeneficiarySet: '0x2906d223dc4163733bb374af8641c7e9ae256e2bae53c90e0c9a2be2e611ae44'
+  };
+
+  // Contracts that credit through the Stacker without (yet) a registry application.
+  const KNOWN_NAMES = {
+    '0x2d5a03d5bab98a4a435edad11813373963bca8cc': 'PLEA (hook)',
+    '0x3d1778be5f9e55f0df35acaf64a13efe2fe81488': 'SelfCredit (trial)'
+  };
+
+  const ASK_NAMES = ['None', 'Application', 'Challenge'];
+  const MAX_UINT = 'f'.repeat(64);
+
   // --- State ---
+  let themeSaved = null;
+  try { themeSaved = localStorage.getItem('imd_acc_theme'); } catch {}
   const state = {
-    theme: localStorage.getItem('imd_acc_theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'),
+    theme: themeSaved || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'),
     account: null,
-    chainId: null,
-    isSepolia: false,
-    faucetClaimed: false,
-    timdApproved: false,
-    mockBalances: {
-      cashback: 25.0,
-      shares: 24.12,
-      worth: 26.35,
-      points: 25.0
-    },
-    stacks: [
-      { project: 'PLEA', trader: '0x71C8...3B19', imd: '15.0000', shares: '14.4648', points: '15.0000', listed: true, time: '2m ago' },
-      { project: 'PLEA', trader: '0x882a...98e1', imd: '10.0000', shares: '9.6432', points: '10.0000', listed: true, time: '14m ago' },
-      { project: 'SelfCredit', trader: '0x3D17...1488', imd: '5.0000', shares: '4.8216', points: '0.0000', listed: false, time: '1h ago' }
-    ],
-    projects: [
-      {
-        address: '0x3D1778bE5f9E55f0dF35ACAF64A13Efe2FE81488',
-        name: 'SelfCredit (Trial Test)',
-        state: 'Negative Case',
-        rateBps: 50,
-        chain: 'Sepolia Testnet',
-        feeFunding: 'Direct test wallet',
-        beneficiary: '0x4b91078b2374c956a65f7af0999cae0a935e6821',
-        history: ['Applied', 'Rejected (trial)'],
-        openQuestion: null,
-        isRegistered: false
-      },
-      {
-        address: '0xf9e2eec3b610ec6781f7438ac5fb4bc049d81cc1',
-        name: 'PLEA (v10 Hook)',
-        state: 'Live Integration',
-        rateBps: 50,
-        chain: 'Ethereum (Sepolia)',
-        feeFunding: 'Trading fee (0.5% cut)',
-        beneficiary: '0x4b91078b2374c956a65f7af0999cae0a935e6821',
-        history: ['Applied', 'Listed', 'Defended'],
-        openQuestion: null,
-        cooldownRemaining: '58 min',
-        isRegistered: true
-      },
-      {
-        address: '0x2b69099e59b05901faa1dd164fabf098bf831e82',
-        name: 'PondPad Launchpad',
-        state: 'Planned',
-        rateBps: 75,
-        chain: 'Robinhood Chain',
-        feeFunding: 'Launchpad trade fee',
-        beneficiary: '0x4b91078b2374c956a65f7af0999cae0a935e6821',
-        history: ['Planned via LayerZero'],
-        openQuestion: null,
-        isRegistered: true
-      }
-    ],
-    appliedProjects: {},
+    busy: false,
     applyForm: {
       project: '',
       name: '',
@@ -92,14 +89,31 @@
       rate: '50',
       beneficiary: '',
       errors: {},
-      mintedFeeToken: false,
-      approvedFee: false
+      note: '',
+      question: ''
     }
+  };
+
+  // What Sepolia says: loaded from public RPCs, refreshed after every confirmed transaction.
+  const live = {
+    status: 'idle', // idle | loading | ready | error
+    error: '',
+    block: 0,
+    time: 0, // the latest block's timestamp
+    fetchedAt: 0, // when it was read (ms)
+    fee: 0n,
+    bond: 0n,
+    cooldown: 0n,
+    vaultPaused: false,
+    stacks: [], // newest first: { project, trader, imd, shares, block, tx }
+    projects: new Map(), // address -> registry project and/or Stacker caller
+    outcomes: [], // newest first
+    wallet: null // { imd, imdAllowance, simd, cashbackValue, feeToken, feeAllowance, bondOwed }
   };
 
   // --- Utilities ---
   function safe(str) {
-    if (!str) return '';
+    if (str === undefined || str === null) return '';
     return String(str)
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
@@ -121,14 +135,362 @@
     if (txt) txt.textContent = msg;
     toast.classList.add('show');
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => toast.classList.remove('show'), 2800);
+    toastTimer = setTimeout(() => toast.classList.remove('show'), 3600);
+  }
+
+  function fmtUnits(value, decimals = 18, dp = 4) {
+    let v = BigInt(value);
+    const neg = v < 0n;
+    if (neg) v = -v;
+    const base = 10n ** BigInt(decimals);
+    const whole = (v / base).toLocaleString('en-US');
+    const frac = (v % base).toString().padStart(decimals, '0').slice(0, dp);
+    return `${neg ? '-' : ''}${whole}${dp ? '.' + frac : ''}`;
+  }
+
+  function parseUnits(text, decimals = 18) {
+    const [w, f = ''] = String(text).trim().split('.');
+    if (!/^\d*$/.test(w) || !/^\d*$/.test(f) || (!w && !f)) throw new Error('Enter an amount');
+    return BigInt(w || '0') * 10n ** BigInt(decimals) + BigInt((f + '0'.repeat(decimals)).slice(0, decimals) || '0');
+  }
+
+  function fmtDuration(seconds) {
+    const s = Number(seconds);
+    if (s % 86400 === 0) return `${s / 86400} day${s === 86400 ? '' : 's'}`;
+    if (s % 3600 === 0) return `${s / 3600} hour${s === 3600 ? '' : 's'}`;
+    if (s % 60 === 0) return `${s / 60} min`;
+    return `${s} s`;
+  }
+
+  // The chain's clock (the latest block's time, moved on since it was read), not the visitor's.
+  function chainNow() {
+    if (!live.time) return Math.floor(Date.now() / 1000);
+    return live.time + Math.floor((Date.now() - live.fetchedAt) / 1000);
+  }
+
+  function fmtAgo(unixSeconds) {
+    const d = Math.max(0, chainNow() - Number(unixSeconds));
+    if (d < 60) return 'just now';
+    if (d < 3600) return `${Math.floor(d / 60)} min ago`;
+    if (d < 86400) return `${Math.floor(d / 3600)} h ago`;
+    return `${Math.floor(d / 86400)} d ago`;
+  }
+
+  function blockText() {
+    if (live.status === 'ready') return `Data at block ${live.block.toLocaleString('en-US')}`;
+    if (live.status === 'error') return 'Sepolia data unavailable';
+    return 'Loading Sepolia data';
+  }
+
+  function txLink(hash, label) {
+    return `<a class="mono" href="https://sepolia.etherscan.io/tx/${hash}" target="_blank" rel="noopener noreferrer">${label}</a>`;
+  }
+
+  function addrLink(addr) {
+    return `<a class="mono" href="https://sepolia.etherscan.io/address/${addr}" target="_blank" rel="noopener noreferrer">${shortAddr(addr)}</a>`;
+  }
+
+  // --- ABI encoding and decoding (only the types the site needs) ---
+  const pad64 = (hex) => hex.replace(/^0x/, '').toLowerCase().padStart(64, '0');
+  const encAddress = (a) => pad64(a);
+  const encUint = (n) => pad64(BigInt(n).toString(16));
+
+  function encString(str) {
+    const hex = [...new TextEncoder().encode(str)].map(b => b.toString(16).padStart(2, '0')).join('');
+    return encUint(hex.length / 2) + hex.padEnd(Math.ceil(hex.length / 64) * 64, '0');
+  }
+
+  // args: [type, value] with type 'address' | 'uint' | 'string'
+  function encodeCall(selector, args = []) {
+    let head = '';
+    let tail = '';
+    for (const [type, value] of args) {
+      if (type === 'string') {
+        head += encUint(args.length * 32 + tail.length / 2);
+        tail += encString(value);
+      } else if (type === 'address') {
+        head += encAddress(value);
+      } else {
+        head += encUint(value);
+      }
+    }
+    return selector + head + tail;
+  }
+
+  function words(hex) {
+    const h = (hex || '').replace(/^0x/, '');
+    const out = [];
+    for (let i = 0; i < h.length; i += 64) out.push(h.slice(i, i + 64));
+    return out;
+  }
+
+  const decUint = (w) => BigInt('0x' + (w || '0'));
+  const decAddress = (w) => '0x' + (w || '').slice(24);
+  const topicAddress = (t) => '0x' + t.slice(26).toLowerCase();
+
+  function decString(hex, offsetBytes) {
+    const h = (hex || '').replace(/^0x/, '');
+    const start = offsetBytes * 2;
+    const len = Number(decUint(h.slice(start, start + 64)));
+    const body = h.slice(start + 64, start + 64 + len * 2);
+    return new TextDecoder().decode(new Uint8Array((body.match(/../g) || []).map(x => parseInt(x, 16))));
+  }
+
+  function decBytes32Text(w) {
+    const bytes = (w.match(/../g) || []).map(x => parseInt(x, 16)).filter(b => b !== 0);
+    return new TextDecoder().decode(new Uint8Array(bytes));
+  }
+
+  // --- Sepolia reads ---
+  async function rpc(method, params) {
+    let lastError = null;
+    for (const url of RPC_URLS) {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 12000);
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+          signal: ctrl.signal
+        });
+        const body = await res.json();
+        if (body.error) {
+          const err = new Error(body.error.message || 'RPC error');
+          err.rpc = true;
+          throw err;
+        }
+        return body.result;
+      } catch (e) {
+        lastError = e;
+        if (e.rpc && method === 'eth_call') throw e; // a revert is the same on every RPC
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+    throw lastError || new Error('No Sepolia RPC answered');
+  }
+
+  const ethCall = (to, data) => rpc('eth_call', [{ to, data }, 'latest']);
+
+  async function getLogs(address, topics, fromBlock, toBlock) {
+    const out = [];
+    const STEP = 10000;
+    for (let a = fromBlock; a <= toBlock; a += STEP) {
+      const b = Math.min(toBlock, a + STEP - 1);
+      const logs = await rpc('eth_getLogs', [{
+        address,
+        topics,
+        fromBlock: '0x' + a.toString(16),
+        toBlock: '0x' + b.toString(16)
+      }]);
+      out.push(...logs);
+    }
+    return out;
+  }
+
+  function decodeRecord(ret) {
+    const w = words(ret);
+    return {
+      ask: Number(decUint(w[0])),
+      listed: decUint(w[1]) === 1n,
+      rateBps: Number(decUint(w[2])),
+      askedAt: Number(decUint(w[3])),
+      fromBlock: Number(decUint(w[4])),
+      toBlock: Number(decUint(w[5])),
+      beneficiary: decAddress(w[6]),
+      challengeOpenAt: Number(decUint(w[7])),
+      asker: decAddress(w[8])
+    };
+  }
+
+  function projectEntry(addr) {
+    const key = addr.toLowerCase();
+    if (!live.projects.has(key)) {
+      live.projects.set(key, {
+        address: key,
+        name: KNOWN_NAMES[key] || '',
+        url: '',
+        rateBps: 0,
+        applicant: '',
+        history: [],
+        periods: [],
+        stacked: 0n,
+        traders: new Set(),
+        thirdPartyStacks: 0,
+        inRegistry: false,
+        record: null
+      });
+    }
+    return live.projects.get(key);
+  }
+
+  function isListedAt(project, block) {
+    const p = live.projects.get(project.toLowerCase());
+    return !!p && p.periods.some(r => block >= r.from && (r.to === null || block < r.to));
+  }
+
+  function projectState(p) {
+    const r = p.record;
+    if (!p.inRegistry || !r) return { label: 'Not applied', cls: 'pill-test' };
+    if (r.ask === 1) return { label: 'Applied', cls: 'pill-planned' };
+    if (r.ask === 2) return { label: 'Challenged', cls: 'pill-planned' };
+    if (r.listed) return { label: 'Listed', cls: 'pill-live' };
+    const last = p.history[p.history.length - 1];
+    if (last && last.kind === 'Delisted') return { label: 'Delisted', cls: 'pill-test' };
+    if (last && last.kind === 'Rejected') return { label: 'Rejected', cls: 'pill-test' };
+    return { label: 'Not listed', cls: 'pill-test' };
+  }
+
+  let loadPromise = null;
+  function loadLive() {
+    if (!loadPromise) {
+      loadPromise = doLoadLive().finally(() => { loadPromise = null; });
+    }
+    return loadPromise;
+  }
+
+  async function doLoadLive() {
+    live.status = live.block ? live.status : 'loading';
+    try {
+      const latest = await rpc('eth_getBlockByNumber', ['latest', false]);
+      const block = Number(latest.number);
+      const [fee, bond, cooldown, paused, stackLogs, regLogs] = await Promise.all([
+        ethCall(ADDRESSES.PROJECT_REGISTRY, SEL.ORACLE_FEE),
+        ethCall(ADDRESSES.PROJECT_REGISTRY, SEL.challengeBond),
+        ethCall(ADDRESSES.PROJECT_REGISTRY, SEL.challengeCooldown),
+        ethCall(ADDRESSES.TEST_SIMD, SEL.paused),
+        getLogs(ADDRESSES.STACKER, [TOPIC.Stacked], DEPLOY_BLOCK.STACKER, block),
+        getLogs(ADDRESSES.PROJECT_REGISTRY, [], DEPLOY_BLOCK.REGISTRY, block)
+      ]);
+
+      live.projects = new Map();
+      live.outcomes = [];
+
+      for (const log of regLogs) {
+        const t = log.topics;
+        if (!t[1]) continue;
+        const kind = Object.keys(TOPIC).find(k => TOPIC[k] === t[0]);
+        if (!kind || kind === 'Stacked') continue;
+        const p = projectEntry(topicAddress(t[1]));
+        p.inRegistry = true;
+        const w = words(log.data);
+        const blk = Number(log.blockNumber);
+        const entry = { kind, block: blk, tx: log.transactionHash, detail: '' };
+        if (kind === 'Applied') {
+          p.rateBps = Number(decUint(w[0]));
+          p.name = decString(log.data, Number(decUint(w[2]))) || p.name;
+          p.url = decString(log.data, Number(decUint(w[3])));
+          p.applicant = topicAddress(t[2]);
+          entry.detail = `${p.rateBps} bps, by ${shortAddr(p.applicant)}`;
+        } else if (kind === 'Listed') {
+          p.periods.push({ from: blk, to: null });
+          entry.detail = `${Number(decUint(w[0]))} bps`;
+        } else if (kind === 'Delisted') {
+          const open = p.periods.find(r => r.to === null);
+          if (open) open.to = blk;
+        } else if (kind === 'Challenged') {
+          entry.detail = `by ${shortAddr(topicAddress(t[2]))}: ${decString(log.data, Number(decUint(w[0])))}`;
+        } else if (kind === 'Defended') {
+          entry.detail = `bond ${fmtUnits(decUint(w[0]), 18, 2)} test IMD to the beneficiary`;
+        } else if (kind === 'AskCleared') {
+          entry.detail = `${ASK_NAMES[Number(decUint(w[0]))] || 'Question'} cleared: ${decBytes32Text(w[2]) || 'no answer'}`;
+        } else if (kind === 'BeneficiarySet') {
+          entry.detail = `to ${shortAddr(decAddress(w[0]))}`;
+        }
+        p.history.push(entry);
+        if (['Listed', 'Rejected', 'Defended', 'Delisted', 'AskCleared'].includes(kind)) {
+          live.outcomes.unshift({ ...entry, project: p.address });
+        }
+      }
+
+      live.stacks = stackLogs.map(log => {
+        const w = words(log.data);
+        return {
+          project: topicAddress(log.topics[1]),
+          trader: topicAddress(log.topics[2]),
+          imd: decUint(w[0]),
+          shares: decUint(w[1]),
+          block: Number(log.blockNumber),
+          tx: log.transactionHash
+        };
+      }).reverse();
+
+      for (const s of live.stacks) {
+        const p = projectEntry(s.project);
+        p.stacked += s.imd;
+        p.traders.add(s.trader);
+        if (s.project !== s.trader) p.thirdPartyStacks++;
+      }
+
+      const registryProjects = [...live.projects.values()].filter(p => p.inRegistry);
+      const records = await Promise.all(registryProjects.map(p =>
+        ethCall(ADDRESSES.PROJECT_REGISTRY, encodeCall(SEL.projectOf, [['address', p.address]]))));
+      registryProjects.forEach((p, i) => { p.record = decodeRecord(records[i]); });
+
+      live.block = block;
+      live.time = Number(latest.timestamp);
+      live.fetchedAt = Date.now();
+      live.fee = decUint(words(fee)[0]);
+      live.bond = decUint(words(bond)[0]);
+      live.cooldown = decUint(words(cooldown)[0]);
+      live.vaultPaused = decUint(words(paused)[0]) === 1n;
+      live.status = 'ready';
+      live.error = '';
+    } catch (e) {
+      if (!live.block) live.status = 'error';
+      live.error = e.message || String(e);
+    }
+  }
+
+  async function loadWallet() {
+    const a = state.account;
+    if (!a) {
+      live.wallet = null;
+      return;
+    }
+    try {
+      const mine = live.stacks.filter(s => s.trader === a.toLowerCase());
+      const shares = mine.reduce((sum, s) => sum + s.shares, 0n);
+      const [imd, imdAllowance, simd, value, feeToken, feeAllowance, owed] = await Promise.all([
+        ethCall(ADDRESSES.TEST_IMD, encodeCall(SEL.balanceOf, [['address', a]])),
+        ethCall(ADDRESSES.TEST_IMD, encodeCall(SEL.allowance, [['address', a], ['address', ADDRESSES.STACKER]])),
+        ethCall(ADDRESSES.TEST_SIMD, encodeCall(SEL.balanceOf, [['address', a]])),
+        ethCall(ADDRESSES.TEST_SIMD, encodeCall(SEL.convertToAssets, [['uint', shares]])),
+        ethCall(ADDRESSES.ORACLE_FEE_TOKEN, encodeCall(SEL.balanceOf, [['address', a]])),
+        ethCall(ADDRESSES.ORACLE_FEE_TOKEN, encodeCall(SEL.allowance, [['address', a], ['address', ADDRESSES.PROJECT_REGISTRY]])),
+        ethCall(ADDRESSES.PROJECT_REGISTRY, encodeCall(SEL.bondOwed, [['address', a]]))
+      ]);
+      const first = (hex) => decUint(words(hex)[0]);
+      live.wallet = {
+        imd: first(imd),
+        imdAllowance: first(imdAllowance),
+        simd: first(simd),
+        cashbackValue: first(value),
+        feeToken: first(feeToken),
+        feeAllowance: first(feeAllowance),
+        bondOwed: first(owed)
+      };
+    } catch (e) {
+      live.wallet = null;
+    }
+  }
+
+  // Re-draw the current page with fresh data, keeping the scroll position. An automatic refresh
+  // doesn't re-draw while someone is typing in a field; the next one will.
+  async function refreshLive(auto = false) {
+    await loadLive();
+    await loadWallet();
+    const el = document.activeElement;
+    if (auto && el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) return;
+    render(true);
   }
 
   // --- Theme Management ---
   function applyTheme(t) {
     state.theme = t;
     document.documentElement.dataset.theme = t;
-    localStorage.setItem('imd_acc_theme', t);
+    try { localStorage.setItem('imd_acc_theme', t); } catch {}
 
     const icon = document.getElementById('icon-theme');
     if (icon) {
@@ -150,34 +512,97 @@
     }
   }
 
-  // --- Web3 Transaction Handler (1.3x Gas Margin) ---
-  async function sendTxWithGas(txParams) {
-    if (!window.ethereum) throw new Error('No Web3 wallet available');
-    const from = state.account || (await window.ethereum.request({ method: 'eth_accounts' }))[0];
-    const tx = { ...txParams, from };
+  // --- Wallet transactions (Sepolia, estimate x 1.3) ---
+  function walletError(e) {
+    if (!e) return 'Transaction failed';
+    if (e.code === 4001 || /user (rejected|denied)/i.test(e.message || '')) return 'Rejected in your wallet';
+    const msg = e.data?.message || e.message || String(e);
+    return msg.length > 160 ? msg.slice(0, 157) + '...' : msg;
+  }
 
-    try {
-      const estHex = await window.ethereum.request({
-        method: 'eth_estimateGas',
-        params: [tx]
-      });
-      const estNum = parseInt(estHex, 16);
-      const gasWithMargin = Math.ceil(estNum * 1.3);
-      tx.gas = '0x' + gasWithMargin.toString(16);
-    } catch (e) {
-      tx.gas = '0x4c4b40'; // Safe fallback
+  async function connectWallet() {
+    if (typeof window.ethereum === 'undefined') {
+      throw new Error('No browser wallet found. Install one (MetaMask, Rabby) to use Sepolia.');
     }
+    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+    if (!accounts || !accounts[0]) throw new Error('No account selected');
+    setAccount(accounts[0]);
+    return state.account;
+  }
 
-    return await window.ethereum.request({
-      method: 'eth_sendTransaction',
-      params: [tx]
-    });
+  async function ensureSepolia() {
+    if (!state.account) await connectWallet();
+    const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+    if (chainId !== ADDRESSES.SEPOLIA_CHAIN_ID) {
+      await window.ethereum.request({
+        method: 'wallet_switchEthereumChain',
+        params: [{ chainId: ADDRESSES.SEPOLIA_CHAIN_ID }]
+      });
+    }
+  }
+
+  async function sendTxWithGas(txParams) {
+    const tx = { ...txParams, from: state.account };
+    let estimate;
+    try {
+      estimate = await window.ethereum.request({ method: 'eth_estimateGas', params: [tx] });
+    } catch (e) {
+      // Sending anyway would only burn gas on a revert.
+      throw new Error(`This transaction would fail: ${walletError(e)}`);
+    }
+    tx.gas = '0x' + Math.ceil(parseInt(estimate, 16) * 1.3).toString(16);
+    return window.ethereum.request({ method: 'eth_sendTransaction', params: [tx] });
+  }
+
+  async function waitForReceipt(hash) {
+    for (let i = 0; i < 60; i++) {
+      let receipt = null;
+      try {
+        receipt = await window.ethereum.request({ method: 'eth_getTransactionReceipt', params: [hash] });
+      } catch {}
+      if (!receipt) {
+        try { receipt = await rpc('eth_getTransactionReceipt', [hash]); } catch {}
+      }
+      if (receipt) return receipt;
+      await new Promise(r => setTimeout(r, 3000));
+    }
+    throw new Error('Not confirmed after 3 minutes. Check the transaction in your wallet.');
+  }
+
+  // Sends one transaction, waits for it, then reloads what Sepolia says.
+  async function sendTx(to, data, label) {
+    if (state.busy) throw new Error('Another transaction is still running');
+    state.busy = true;
+    try {
+      await ensureSepolia();
+      showToast(`${label}: confirm in your wallet`);
+      const hash = await sendTxWithGas({ to, data });
+      showToast(`${label}: sent, waiting for Sepolia`);
+      const receipt = await waitForReceipt(hash);
+      if (receipt.status !== '0x1') throw new Error(`${label} failed on chain`);
+      showToast(`${label}: confirmed`);
+      return receipt;
+    } finally {
+      state.busy = false;
+      refreshLive();
+    }
+  }
+
+  function setAccount(account) {
+    state.account = account ? account.toLowerCase() : null;
+    const label = document.getElementById('wallet-label');
+    const btn = document.getElementById('btn-wallet');
+    if (label) label.textContent = state.account ? shortAddr(state.account) : 'Connect Wallet';
+    if (btn) {
+      btn.classList.toggle('btn-primary', !!state.account);
+      btn.classList.toggle('btn-secondary', !state.account);
+    }
   }
 
   // --- Router & Page Renderers ---
   const appRoot = document.getElementById('app-root');
 
-  function render() {
+  function render(keepScroll = false) {
     const rawHash = location.hash || '#/';
     let route = rawHash.replace(/^#/, '');
     if (!route || route === '/') route = '/';
@@ -221,13 +646,14 @@
       location.replace('#/docs/contracts');
       return;
     } else if (route === '/docs' || route.startsWith('/docs/')) {
+      if (keepScroll) return; // the docs don't change with chain data
       renderDocs(route.slice('/docs/'.length) || 'introduction');
     } else {
       renderNotFound();
     }
 
-    // Scroll cleanly to top (without triggering artificial focus outlines)
-    window.scrollTo({ top: 0, behavior: 'instant' });
+    // Scroll cleanly to top on navigation (without triggering artificial focus outlines)
+    if (!keepScroll) window.scrollTo({ top: 0, behavior: 'instant' });
     initCommonListeners();
   }
 
@@ -336,9 +762,9 @@
         <div class="dashboard-card" style="padding: 24px;">
           <div class="card-header-row" style="margin-bottom: 12px;">
             <h3 class="card-title" style="font-size: 1.05rem;">Live Sepolia Network Status</h3>
-            <span class="pill pill-live">Test Run 2 Live</span>
+            <span class="pill pill-live">Test Run 4 Live</span>
           </div>
-          <p class="secondary" style="margin-bottom: 16px;">${DATA_BLOCK_TEXT} &middot; Stacker and ProjectRegistry verified and operational.</p>
+          <p class="secondary" style="margin-bottom: 16px;">${blockText()} &middot; Stacker (launch #1294) and ProjectRegistry (launch #1378) live${live.status === 'ready' ? `: ${live.stacks.length} cashback credit${live.stacks.length === 1 ? '' : 's'} so far, ${[...live.projects.values()].filter(p => p.record && p.record.listed).length} listed project(s)` : ''}.</p>
           <div style="display: flex; gap: 12px; flex-wrap: wrap;">
             <a href="#/stack" class="btn btn-primary btn-sm">Your Stack Console</a>
             <a href="#/docs" class="btn btn-secondary btn-sm">Read the Docs</a>
@@ -350,14 +776,38 @@
   }
 
   // --- Page: Stack & Test Tools (#/stack) ---
+  function stackRows(rows, emptyText) {
+    if (!rows.length) {
+      return `<tr><td colspan="5" class="secondary">${emptyText}</td></tr>`;
+    }
+    return rows.map(s => {
+      const p = live.projects.get(s.project);
+      const listed = isListedAt(s.project, s.block);
+      return `
+        <tr>
+          <td><strong class="mono">${s.project === s.trader ? 'Self-stack' : safe(p?.name || shortAddr(s.project))}</strong><div class="secondary" style="font-size: 0.76rem;">${txLink(s.tx, 'block ' + s.block.toLocaleString('en-US'))}</div></td>
+          <td class="mono" style="white-space: nowrap;">${fmtUnits(s.imd)} IMD</td>
+          <td class="mono" style="white-space: nowrap;">${fmtUnits(s.shares, 24)} sIMD</td>
+          <td class="mono">${listed ? fmtUnits(s.imd) : '0.0000'}</td>
+          <td><span class="pill ${listed ? 'pill-live' : 'pill-test'}">${listed ? 'Listed' : 'Direct'}</span></td>
+        </tr>`;
+    }).join('');
+  }
+
   function renderStack() {
     document.title = 'Stack - imd/acc';
-    const b = state.mockBalances;
+    const a = state.account;
+    const w = live.wallet;
+    const mine = a ? live.stacks.filter(s => s.trader === a) : [];
+    const cashback = mine.reduce((t, s) => t + s.imd, 0n);
+    const points = mine.reduce((t, s) => t + (isListedAt(s.project, s.block) ? s.imd : 0n), 0n);
+    const shown = a ? mine : live.stacks.slice(0, 10);
+    const dash = '&mdash;';
 
     appRoot.innerHTML = `
       <div class="page-view">
         <div class="page-header-block">
-          <div class="page-tag"><span class="status-indicator"></span> Sepolia Testnet &middot; ${DATA_BLOCK_TEXT}</div>
+          <div class="page-tag"><span class="status-indicator"></span> Sepolia Test Run 4 &middot; ${blockText()}</div>
           <h1 class="page-title">Your Stack & Testnet Console</h1>
           <p class="page-desc">Track accumulated cashback, sIMD vault shares, and use the Sepolia testnet tools.</p>
         </div>
@@ -367,39 +817,39 @@
           <div class="dashboard-card">
             <div class="card-header-row">
               <h3 class="card-title">Your Stack Dashboard</h3>
-              <div class="badge-status ${state.account ? 'connected' : 'disconnected'}">
+              <div class="badge-status ${a ? 'connected' : 'disconnected'}">
                 <span class="status-indicator"></span>
-                <span>${state.account ? `Connected: ${shortAddr(state.account)}` : 'Demo Mode (Connect Wallet for on-chain reads)'}</span>
+                <span>${a ? `Connected: ${shortAddr(a)}` : 'Connect a wallet to see your stack'}</span>
               </div>
             </div>
 
             <div class="stats-grid">
               <div class="stat-box">
                 <span class="stat-label">Cashback Received</span>
-                <span class="stat-val" id="stat-cashback">${b.cashback.toFixed(4)} IMD</span>
-                <span class="stat-change">From 5 listed trades</span>
+                <span class="stat-val" id="stat-cashback">${a ? fmtUnits(cashback) + ' IMD' : dash}</span>
+                <span class="stat-change">${a ? `From ${mine.length} credit${mine.length === 1 ? '' : 's'}` : 'From your Stacked events'}</span>
               </div>
 
               <div class="stat-box">
                 <span class="stat-label">sIMD Shares Held</span>
-                <span class="stat-val" id="stat-shares">${b.shares.toFixed(4)} sIMD</span>
-                <span class="stat-change">Live in ERC-4626 vault</span>
+                <span class="stat-val" id="stat-shares">${w ? fmtUnits(w.simd, 24) + ' sIMD' : dash}</span>
+                <span class="stat-change">Live in the TestSIMD vault</span>
               </div>
 
               <div class="stat-box">
                 <span class="stat-label">Current Value</span>
-                <span class="stat-val" id="stat-worth">${b.worth.toFixed(4)} IMD</span>
-                <span class="stat-change">+${(b.worth - b.cashback).toFixed(4)} IMD yield</span>
+                <span class="stat-val" id="stat-worth">${w ? fmtUnits(w.cashbackValue) + ' IMD' : dash}</span>
+                <span class="stat-change">${w ? `+${fmtUnits(w.cashbackValue > cashback ? w.cashbackValue - cashback : 0n)} IMD yield` : 'Your cashback, priced by the vault'}</span>
               </div>
 
               <div class="stat-box">
                 <span class="stat-label">Total Points</span>
-                <span class="stat-val" id="stat-points">${b.points.toFixed(4)} PTS</span>
-                <span class="stat-change">1 PT per IMD stacked</span>
+                <span class="stat-val" id="stat-points">${a ? fmtUnits(points) + ' PTS' : dash}</span>
+                <span class="stat-change">1 PT per IMD from listed projects</span>
               </div>
             </div>
 
-            <h4 style="font-size: 0.95rem; margin-bottom: 12px;">Recent Cashback Events</h4>
+            <h4 style="font-size: 0.95rem; margin-bottom: 12px;">${a ? 'Your Cashback Events' : 'Recent Cashback Events (all traders)'}</h4>
             <div class="projects-table-wrap">
               <table class="data-table">
                 <thead>
@@ -412,15 +862,9 @@
                   </tr>
                 </thead>
                 <tbody id="events-table-body">
-                  ${state.stacks.map(s => `
-                    <tr>
-                      <td><strong class="mono">${safe(s.project)}</strong></td>
-                      <td class="mono">${safe(s.imd)} IMD</td>
-                      <td class="mono">${safe(s.shares)} sIMD</td>
-                      <td class="mono">${safe(s.points)}</td>
-                      <td><span class="pill ${s.listed ? 'pill-live' : 'pill-test'}">${s.listed ? 'Listed' : 'Direct'}</span></td>
-                    </tr>
-                  `).join('')}
+                  ${live.status === 'ready'
+                    ? stackRows(shown, a ? 'No cashback for this wallet yet. Try "Stack to myself".' : 'No cashback credited yet.')
+                    : `<tr><td colspan="5" class="secondary">${blockText()}</td></tr>`}
                 </tbody>
               </table>
             </div>
@@ -430,7 +874,7 @@
           <div class="test-tools-box">
             <div class="tool-card">
               <h4 class="tool-title">Sepolia Test IMD Faucet</h4>
-              <p class="tool-desc">Request 10,000 TestIMD per address every 24 hours to test trades and crediting.</p>
+              <p class="tool-desc">Request 10,000 TestIMD per address every 24 hours to test trades and crediting.${w ? ` You hold <span class="mono">${fmtUnits(w.imd, 18, 2)}</span> tIMD.` : ''}</p>
               <button class="btn btn-primary btn-sm" id="btn-faucet" style="width: 100%;">
                 <span>Request 10,000 TestIMD</span>
               </button>
@@ -440,8 +884,8 @@
               <h4 class="tool-title">Test "Stack to Myself"</h4>
               <p class="tool-desc">Approve TestIMD and call <code>Stacker.credit(self, amount)</code> to test the vault minting path.</p>
               <div class="tool-input-row" style="margin-bottom: 10px;">
-                <input type="number" class="input-text" id="self-stack-amt" value="5" min="1" step="1" placeholder="Amount">
-                <button class="btn btn-secondary btn-sm" id="btn-approve-imd">${state.timdApproved ? 'Approved' : 'Approve'}</button>
+                <input type="number" class="input-text" id="self-stack-amt" value="5" min="0" step="any" placeholder="Amount">
+                <button class="btn btn-secondary btn-sm" id="btn-approve-imd">${w && w.imdAllowance > 10n ** 30n ? 'Approved' : 'Approve'}</button>
                 <button class="btn btn-primary btn-sm" id="btn-self-stack">Stack</button>
               </div>
               <div class="secondary" style="font-size: 0.78rem;">Self-stacks are direct, no points.</div>
@@ -449,11 +893,14 @@
 
             <div class="tool-card" style="background: var(--bg-card);">
               <h4 class="tool-title">Sepolia Verification Status</h4>
-              <p class="tool-desc" style="margin-bottom: 8px;">Stacker v2 deployed at block <code>11,891,109</code>.</p>
+              <p class="tool-desc" style="margin-bottom: 8px;">Stacker at block <code>${DEPLOY_BLOCK.STACKER.toLocaleString('en-US')}</code> (launch #1294); ProjectRegistry at block <code>${DEPLOY_BLOCK.REGISTRY.toLocaleString('en-US')}</code> (launch #1378).</p>
               <div style="font-size: 0.8rem; color: var(--text-muted); line-height: 1.5;">
-                • Vault status: <span style="color: var(--status-live);">Active (Unpaused)</span><br>
-                • Challenge bond: <span class="mono">5 TestIMD</span><br>
-                • Cooldown: <span class="mono">1 Hour</span>
+                &bull; Vault status: ${live.status === 'ready'
+                  ? `<span style="color: ${live.vaultPaused ? 'var(--status-pending)' : 'var(--status-live)'};">${live.vaultPaused ? 'Paused (credits revert)' : 'Active (Unpaused)'}</span>`
+                  : '<span class="mono">&mdash;</span>'}<br>
+                &bull; Oracle fee: <span class="mono">${live.status === 'ready' ? fmtUnits(live.fee, 18, 2) + ' test IMD' : '&mdash;'}</span><br>
+                &bull; Challenge bond: <span class="mono">${live.status === 'ready' ? fmtUnits(live.bond, 18, 0) + ' test IMD' : '&mdash;'}</span><br>
+                &bull; Cooldown: <span class="mono">${live.status === 'ready' ? fmtDuration(live.cooldown) : '&mdash;'}</span>
               </div>
             </div>
           </div>
@@ -463,86 +910,87 @@
 
     document.getElementById('btn-faucet')?.addEventListener('click', async () => {
       try {
-        await sendTxWithGas({
-          to: ADDRESSES.TEST_IMD,
-          data: '0xde5f72fd'
-        });
-        showToast('Faucet transaction sent on Sepolia!');
+        await sendTx(ADDRESSES.TEST_IMD, SEL.faucet, 'Faucet');
       } catch (e) {
-        showToast('Simulated +10,000 tIMD added in demo!');
+        showToast(walletError(e));
       }
-      state.faucetClaimed = true;
     });
 
     document.getElementById('btn-approve-imd')?.addEventListener('click', async () => {
       try {
-        await sendTxWithGas({
-          to: ADDRESSES.TEST_IMD,
-          data: '0x095ea7b3000000000000000000000000' + ADDRESSES.STACKER.slice(2).toLowerCase() + 'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'
-        });
-        showToast('TestIMD approved for Stacker!');
+        await sendTx(ADDRESSES.TEST_IMD, SEL.approve + encAddress(ADDRESSES.STACKER) + MAX_UINT, 'Approve TestIMD');
       } catch (e) {
-        showToast('TestIMD approved in demo mode!');
+        showToast(walletError(e));
       }
-      state.timdApproved = true;
-      document.getElementById('btn-approve-imd').textContent = 'Approved';
     });
 
     document.getElementById('btn-self-stack')?.addEventListener('click', async () => {
-      const amt = parseFloat(document.getElementById('self-stack-amt')?.value) || 5;
       try {
-        const addrPadded = (state.account || '0xa987ef2aa4d2c0558cc6405f1a8253507274dc5d').slice(2).padStart(64, '0');
-        const amtHex = (amt * 1e18).toString(16).padStart(64, '0');
-        await sendTxWithGas({
-          to: ADDRESSES.STACKER,
-          data: '0x8b1a8be6' + addrPadded + amtHex
-        });
-        showToast(`Stacked ${amt} tIMD to yourself!`);
+        const amount = parseUnits(document.getElementById('self-stack-amt')?.value || '0');
+        if (amount === 0n) throw new Error('Enter an amount above 0');
+        await ensureSepolia();
+        await sendTx(ADDRESSES.STACKER, encodeCall(SEL.credit, [['address', state.account], ['uint', amount]]), 'Stack to myself');
       } catch (e) {
-        showToast(`Stacked ${amt} tIMD (simulated in demo)!`);
+        showToast(walletError(e));
       }
-      state.mockBalances.cashback += amt;
-      state.mockBalances.shares += (amt / 1.037);
-      state.mockBalances.worth += amt * 1.04;
-      state.stacks.unshift({
-        project: 'SelfCredit',
-        trader: shortAddr(state.account || '0xa987ef2aa4d2c0558cc6405f1a8253507274dc5d'),
-        imd: amt.toFixed(4),
-        shares: (amt / 1.037).toFixed(4),
-        points: '0.0000',
-        listed: false,
-        time: 'just now'
-      });
-      renderStack();
     });
   }
 
   // --- Page: Projects (#/projects) ---
   let activeFilter = 'all';
 
+  // Registry projects, and contracts that credited someone else (not wallets stacking to themselves).
+  function allProjects() {
+    return [...live.projects.values()].filter(p => p.inRegistry || p.thirdPartyStacks > 0).sort((x, y) =>
+      Number(y.inRegistry) - Number(x.inRegistry) || (y.stacked > x.stacked ? 1 : y.stacked < x.stacked ? -1 : 0));
+  }
+
   function renderProjects() {
     document.title = 'Projects - imd/acc';
-    const allProjs = [...state.projects, ...Object.values(state.appliedProjects)];
-
-    const filtered = allProjs.filter(p => {
-      if (activeFilter === 'all') return true;
-      if (activeFilter === 'live') return p.state.toLowerCase().includes('live') || p.state.toLowerCase().includes('listed');
-      if (activeFilter === 'planned') return p.state.toLowerCase().includes('planned') || p.state.toLowerCase().includes('applied');
+    const projects = allProjects().filter(p => {
+      const st = projectState(p).label;
+      if (activeFilter === 'listed') return st === 'Listed';
+      if (activeFilter === 'pending') return st === 'Applied' || st === 'Challenged';
+      if (activeFilter === 'direct') return !p.inRegistry;
       return true;
     });
+
+    let rows;
+    if (live.status !== 'ready') {
+      rows = `<tr><td colspan="6" class="secondary">${blockText()}</td></tr>`;
+    } else if (!projects.length) {
+      rows = `<tr><td colspan="6" class="secondary">No projects here yet. <a href="#/apply" style="color: var(--accent-primary);">Apply for a listing</a>.</td></tr>`;
+    } else {
+      rows = projects.map(p => {
+        const st = projectState(p);
+        return `
+          <tr style="cursor: pointer;" onclick="location.hash='#/projects/${p.address}'">
+            <td>
+              <div style="font-weight: 700; color: var(--text-primary);">${safe(p.name || shortAddr(p.address))}</div>
+              <div class="secondary mono" style="font-size: 0.76rem;">${shortAddr(p.address)}</div>
+            </td>
+            <td><span class="mono">Sepolia</span></td>
+            <td>${p.rateBps ? `<strong class="mono" style="color: var(--accent-light);">${(p.rateBps / 100).toFixed(2)}% (${p.rateBps} bps)</strong>` : '<span class="secondary">&mdash;</span>'}</td>
+            <td class="mono">${fmtUnits(p.stacked, 18, 2)} IMD</td>
+            <td><span class="pill ${st.cls}">${st.label}</span></td>
+            <td><a href="#/projects/${p.address}" class="btn btn-secondary btn-sm">&rarr; View</a></td>
+          </tr>`;
+      }).join('');
+    }
 
     appRoot.innerHTML = `
       <div class="page-view">
         <div class="page-header-block">
-          <div class="page-tag">Ecosystem Registry &middot; ${DATA_BLOCK_TEXT}</div>
+          <div class="page-tag">Test Run 4 Registry &middot; ${blockText()}</div>
           <h1 class="page-title">Participating Projects</h1>
           <p class="page-desc">Only credits from listed projects earn points. Every project selects its rate between 0.25% and 1.0%.</p>
         </div>
 
         <div class="filter-tabs">
           <button class="filter-tab ${activeFilter === 'all' ? 'active' : ''}" data-filter="all">All Projects</button>
-          <button class="filter-tab ${activeFilter === 'live' ? 'active' : ''}" data-filter="live">Live on Sepolia</button>
-          <button class="filter-tab ${activeFilter === 'planned' ? 'active' : ''}" data-filter="planned">Planned Mainnet</button>
+          <button class="filter-tab ${activeFilter === 'listed' ? 'active' : ''}" data-filter="listed">Listed</button>
+          <button class="filter-tab ${activeFilter === 'pending' ? 'active' : ''}" data-filter="pending">Open Questions</button>
+          <button class="filter-tab ${activeFilter === 'direct' ? 'active' : ''}" data-filter="direct">Not Applied</button>
         </div>
 
         <div class="projects-table-wrap">
@@ -552,28 +1000,15 @@
                 <th>Project</th>
                 <th>Chain</th>
                 <th>Cashback Rate</th>
-                <th>Fee Funding</th>
+                <th>IMD Stacked</th>
                 <th>Registry Status</th>
                 <th>Details</th>
               </tr>
             </thead>
-            <tbody>
-              ${filtered.map(p => `
-                <tr style="cursor: pointer;" onclick="location.hash='#/projects/${p.address}'">
-                  <td>
-                    <div style="font-weight: 700; color: var(--text-primary);">${safe(p.name)}</div>
-                    <div class="secondary mono" style="font-size: 0.76rem;">${shortAddr(p.address)}</div>
-                  </td>
-                  <td><span class="mono">${safe(p.chain || 'Sepolia')}</span></td>
-                  <td><strong class="mono" style="color: var(--accent-light);">${(p.rateBps / 100).toFixed(2)}% (${p.rateBps} bps)</strong></td>
-                  <td>${safe(p.feeFunding || 'Trading fee cut')}</td>
-                  <td><span class="pill ${p.state.includes('Live') || p.state.includes('Listed') ? 'pill-live' : p.state.includes('Planned') ? 'pill-planned' : 'pill-test'}">${safe(p.state)}</span></td>
-                  <td><a href="#/projects/${p.address}" class="btn btn-secondary btn-sm">&rarr; View</a></td>
-                </tr>
-              `).join('')}
-            </tbody>
+            <tbody>${rows}</tbody>
           </table>
         </div>
+        <p class="secondary" style="font-size: 0.84rem;">Projects come from the test run 4 ProjectRegistry (<span class="mono">${shortAddr(ADDRESSES.PROJECT_REGISTRY)}</span>) and from contracts that credit through the Stacker. Planned: PLEA on Ethereum mainnet, and PondPad on Robinhood Chain through the <a href="#/docs/multichain" style="color: var(--accent-primary);">multichain route</a>.</p>
       </div>
     `;
 
@@ -589,18 +1024,18 @@
   function renderProjectDetail(rawAddr) {
     const addr = rawAddr.toLowerCase();
     document.title = `Project ${shortAddr(rawAddr)} - imd/acc`;
-    const allProjs = [...state.projects, ...Object.values(state.appliedProjects)];
-    const p = allProjs.find(x => x.address.toLowerCase() === addr);
+    const p = live.projects.get(addr);
 
-    if (!p) {
+    if (!/^0x[0-9a-f]{40}$/.test(addr) || (!p && live.status === 'ready')) {
       appRoot.innerHTML = `
         <div class="page-view">
           <div class="page-header-block">
+            <div class="page-tag"><a href="#/projects">&larr; Projects Directory</a></div>
             <h1 class="page-title">Project Not Found</h1>
           </div>
           <div class="dashboard-card">
-            <p class="secondary">Contract ${safe(rawAddr)} has not been applied to the ProjectRegistry, or has no recorded events.</p>
-            <div style="margin-top: 16px;">
+            <p class="secondary" style="overflow-wrap: anywhere;">Contract <span class="mono">${safe(rawAddr)}</span> has not applied to the test run 4 ProjectRegistry and has no Stacker credits.</p>
+            <div style="margin-top: 16px; display: flex; gap: 10px; flex-wrap: wrap;">
               <a href="#/projects" class="btn btn-secondary btn-sm">&larr; Back to Projects</a>
               <a href="#/apply" class="btn btn-primary btn-sm">Apply for Listing</a>
             </div>
@@ -610,75 +1045,161 @@
       return;
     }
 
+    if (!p) {
+      appRoot.innerHTML = `
+        <div class="page-view">
+          <div class="page-header-block">
+            <div class="page-tag"><a href="#/projects">&larr; Projects Directory</a></div>
+            <h1 class="page-title">${shortAddr(addr)}</h1>
+            <p class="page-desc">${blockText()}</p>
+          </div>
+        </div>
+      `;
+      return;
+    }
+
+    const st = projectState(p);
+    const r = p.record;
+    const now = chainNow();
+    const needed = live.fee + live.bond;
+    let challengeBody;
+    if (!r || !r.listed) {
+      challengeBody = `<p class="secondary">Only listed projects can be challenged. ${p.inRegistry ? '' : 'This contract has not applied to the registry.'}</p>`;
+    } else if (r.ask !== 0) {
+      challengeBody = `<p class="secondary">A question about this project is open; it can be challenged once it settles.</p>`;
+    } else {
+      const wait = r.challengeOpenAt > now ? r.challengeOpenAt - now : 0;
+      challengeBody = `
+        <p class="secondary" style="margin-bottom: 14px;">Anyone can challenge a listed project for the ${fmtUnits(live.fee, 18, 2)} test IMD fee plus a ${fmtUnits(live.bond, 18, 0)} test IMD bond. If the panel says it still meets the rules, the bond goes to its beneficiary; otherwise it is delisted and the bond comes back.</p>
+        ${wait ? `<p class="secondary" style="color: var(--status-pending); margin-bottom: 12px;">Cooldown active. Challenge opens in ${fmtDuration(Math.ceil(wait / 60) * 60)}.</p>` : ''}
+        <div class="form-group">
+          <label class="form-label" for="ch-reason">Reason for Challenge</label>
+          <input type="text" id="ch-reason" class="form-input" maxlength="280" placeholder="State reason (max 280 chars)...">
+          <div id="ch-reason-error" class="field-error"></div>
+        </div>
+        <button class="btn btn-secondary btn-sm" id="btn-submit-challenge"${wait ? ' disabled' : ''}>Submit Challenge (${fmtUnits(needed, 18, 1)} test IMD)</button>`;
+    }
+
+    const expirable = r && r.ask !== 0 && now > r.askedAt + 86400;
+    const periods = p.periods.map(x => `from block ${x.from.toLocaleString('en-US')}${x.to ? ` to ${x.to.toLocaleString('en-US')}` : ' (current)'}`);
+
     appRoot.innerHTML = `
       <div class="page-view">
         <div class="page-header-block">
           <div class="page-tag"><a href="#/projects">&larr; Projects Directory</a></div>
-          <h1 class="page-title">${safe(p.name)}</h1>
-          <p class="page-desc mono" style="font-size: 0.88rem;">${safe(p.address)}</p>
+          <h1 class="page-title">${safe(p.name || shortAddr(p.address))}</h1>
+          <p class="page-desc mono" style="font-size: 0.88rem; overflow-wrap: anywhere;">${p.address}</p>
         </div>
 
         <div class="grid-2">
           <div class="dashboard-card">
             <div class="card-header-row">
               <h3 class="card-title">Project Details</h3>
-              <span class="pill ${p.state.includes('Live') || p.state.includes('Listed') ? 'pill-live' : 'pill-planned'}">${safe(p.state)}</span>
+              <span class="pill ${st.cls}">${st.label}</span>
             </div>
-            <p style="margin-bottom: 8px;">Applied rate: <strong class="mono" style="color: var(--accent-light);">${(p.rateBps / 100).toFixed(2)}% (${p.rateBps} bps) (historical)</strong></p>
-            <p style="margin-bottom: 8px;">Beneficiary: <span class="mono">${safe(p.beneficiary)}</span></p>
-            <p>Fee Funding: ${safe(p.feeFunding || 'Trading fee cut')}</p>
+            <p style="margin-bottom: 8px;">Applied rate: ${p.rateBps ? `<strong class="mono" style="color: var(--accent-light);">${(p.rateBps / 100).toFixed(2)}% (${p.rateBps} bps)</strong>` : '<span class="secondary">not applied</span>'}</p>
+            <p style="margin-bottom: 8px;">Beneficiary: ${r && r.beneficiary !== '0x0000000000000000000000000000000000000000' ? addrLink(r.beneficiary) : '<span class="secondary">&mdash;</span>'}</p>
+            <p style="margin-bottom: 8px;">IMD stacked through it: <span class="mono">${fmtUnits(p.stacked, 18, 4)} IMD</span> (${p.traders.size} trader${p.traders.size === 1 ? '' : 's'})</p>
+            <p style="margin-bottom: 8px;">Listing periods: <span class="secondary">${periods.length ? periods.join('; ') : 'none'}</span></p>
+            ${p.url ? `<p style="overflow-wrap: anywhere;">Source: <a href="${safe(p.url)}" target="_blank" rel="noopener noreferrer" style="color: var(--accent-primary);">${safe(p.url)}</a></p>` : ''}
 
             <h4 style="font-size: 0.95rem; margin-top: 20px; margin-bottom: 10px;">Registry Event Log</h4>
             <ul style="list-style: none; display: flex; flex-direction: column; gap: 6px; font-size: 0.85rem;" class="secondary">
-              ${(p.history || []).map(h => `<li>&bull; ${safe(h)}</li>`).join('')}
+              ${p.history.length ? p.history.map(h => `<li>&bull; <strong style="color: var(--text-primary);">${h.kind}</strong> ${safe(h.detail)} &middot; ${txLink(h.tx, 'block ' + h.block.toLocaleString('en-US'))}</li>`).join('') : '<li>No registry events.</li>'}
             </ul>
+            ${expirable ? `<button class="btn btn-secondary btn-sm" id="btn-expire" style="margin-top: 16px;">Clear the expired question</button>` : ''}
           </div>
 
           <div class="dashboard-card">
             <div class="card-header-row">
               <h3 class="card-title">Challenge Listing</h3>
             </div>
-            <p class="secondary" style="margin-bottom: 14px;">Anyone can challenge a listed project with a 5 test IMD bond + 0.5 fee. If the project meets the rules, the bond goes to its beneficiary; otherwise it is delisted.</p>
-            ${p.cooldownRemaining ? `<p class="secondary" style="color: var(--status-pending); margin-bottom: 12px;">Cooldown active. Challenge opens in ${p.cooldownRemaining}.</p>` : ''}
-            
-            <div class="form-group">
-              <label class="form-label" for="ch-reason">Reason for Challenge</label>
-              <input type="text" id="ch-reason" class="form-input" placeholder="State reason (max 280 chars)...">
-              <div id="ch-reason-error" class="field-error"></div>
-            </div>
-
-            <button class="btn btn-secondary btn-sm" id="btn-submit-challenge">Submit Challenge (5.5 tIMD)</button>
+            ${challengeBody}
           </div>
         </div>
       </div>
     `;
 
-    document.getElementById('btn-submit-challenge')?.addEventListener('click', () => {
-      const reason = document.getElementById('ch-reason')?.value?.trim();
+    document.getElementById('btn-submit-challenge')?.addEventListener('click', async () => {
+      const reason = document.getElementById('ch-reason')?.value?.trim() || '';
       const err = document.getElementById('ch-reason-error');
-      if (!reason) {
-        if (err) err.textContent = 'Reason is required';
+      const textError = checkText(reason, 1, 280, 'reason');
+      if (textError) {
+        if (err) err.textContent = textError;
         return;
       }
-      showToast('Challenge submitted (simulated on Sepolia)!');
-      p.history.push('Challenged');
-      renderProjectDetail(rawAddr);
+      if (err) err.textContent = '';
+      try {
+        await ensureSepolia();
+        await loadWallet();
+        const w = live.wallet;
+        if (!w || w.feeToken < needed) throw new Error(`You need ${fmtUnits(needed, 18, 1)} test IMD: use "Get 10 test IMD" on the Apply page`);
+        if (w.feeAllowance < needed) {
+          await sendTx(ADDRESSES.ORACLE_FEE_TOKEN, SEL.approve + encAddress(ADDRESSES.PROJECT_REGISTRY) + encUint(needed), 'Approve fee and bond');
+        }
+        await sendTx(ADDRESSES.PROJECT_REGISTRY, encodeCall(SEL.challengeForBeneficiary, [['address', p.address], ['string', reason], ['address', r.beneficiary]]), 'Challenge');
+      } catch (e) {
+        showToast(walletError(e));
+      }
+    });
+
+    document.getElementById('btn-expire')?.addEventListener('click', async () => {
+      try {
+        await sendTx(ADDRESSES.PROJECT_REGISTRY, encodeCall(SEL.expire, [['address', p.address]]), 'Clear question');
+      } catch (e) {
+        showToast(walletError(e));
+      }
     });
   }
 
   // --- Page: Apply (#/apply) ---
+  // The registry's own text rules: printable ASCII without quotes, backslashes or brackets.
+  function checkText(val, min, max, what) {
+    if (val.length < min) return `${what} is required`;
+    if (val.length > max) return `${what} too long (maximum ${max} characters)`;
+    if (val.includes('"')) return 'disallowed character: double quote';
+    if (val.includes('\\')) return 'disallowed character: backslash';
+    if (/[[\]]/.test(val)) return 'disallowed character: square bracket';
+    if (/[^\x20-\x7E]/.test(val)) return 'disallowed character: non-ASCII';
+    return '';
+  }
+
+  function validateApply(id, val) {
+    val = (val || '').trim();
+    if (id === 'project' || id === 'beneficiary') {
+      if (!/^0x[a-fA-F0-9]{40}$/.test(val)) return 'not an address';
+      if (/^0x0{40}$/.test(val)) return 'cannot be the zero address';
+    }
+    if (id === 'name') return checkText(val, 1, 48, 'name');
+    if (id === 'url') {
+      if (!val.startsWith('https://')) return 'URL must start with https://';
+      return checkText(val, 12, 200, 'URL');
+    }
+    if (id === 'rate') {
+      if (!/^\d+$/.test(val) || +val < 25 || +val > 100) return 'rate must be between 25 and 100 bps';
+    }
+    return '';
+  }
+
+  function applyStatus() {
+    const w = live.wallet;
+    if (!state.account) return 'Connect a wallet on Sepolia to apply.';
+    if (!w || live.status !== 'ready') return 'Reading your balance from Sepolia...';
+    if (w.feeToken < live.fee) return `You need ${fmtUnits(live.fee, 18, 2)} test IMD for the fee: use "Get 10 test IMD".`;
+    if (w.feeAllowance < live.fee) return `Approve the ${fmtUnits(live.fee, 18, 2)} test IMD fee to the registry.`;
+    return `Ready: the ${fmtUnits(live.fee, 18, 2)} test IMD fee is approved.`;
+  }
+
   function renderApply() {
     document.title = 'Apply - imd/acc';
     const f = state.applyForm;
-
-    const panelQ = f.project && f.name && f.url && f.rate
-      ? `imd/acc listing review: Is project ${f.project} (${f.name}) at ${f.url} a genuine trading pool/contract with fee >= cashback rate (${f.rate} bps)?`
-      : 'imd/acc listing review: Fill out the application form to generate the exact oracle question.';
+    const w = live.wallet;
+    const open = allProjects().filter(p => p.record && p.record.ask !== 0);
 
     appRoot.innerHTML = `
       <div class="page-view">
         <div class="page-header-block">
-          <div class="page-tag">On-Chain Registry &middot; ${DATA_BLOCK_TEXT}</div>
+          <div class="page-tag">Test Run 4 Registry &middot; ${blockText()}</div>
           <h1 class="page-title">Apply for Project Listing</h1>
           <p class="page-desc">List your project on the ownerless ProjectRegistry so your traders' cashback credits earn points.</p>
         </div>
@@ -695,13 +1216,13 @@
 
             <div class="form-group">
               <label class="form-label" for="apply-name">Project Name (1-48 chars)</label>
-              <input type="text" id="apply-name" class="form-input" value="${safe(f.name)}" placeholder="e.g. PLEA v11">
+              <input type="text" id="apply-name" class="form-input" value="${safe(f.name)}" placeholder="e.g. PLEA">
               <div id="apply-name-error" class="field-error">${safe(f.errors.name || '')}</div>
             </div>
 
             <div class="form-group">
               <label class="form-label" for="apply-url">Verified Source URL (https://)</label>
-              <input type="text" id="apply-url" class="form-input" value="${safe(f.url)}" placeholder="https://github.com/...">
+              <input type="text" id="apply-url" class="form-input" value="${safe(f.url)}" placeholder="https://repo.sourcify.dev/...">
               <div id="apply-url-error" class="field-error">${safe(f.errors.url || '')}</div>
             </div>
 
@@ -722,15 +1243,13 @@
               <button class="btn btn-secondary btn-sm" id="btn-approve-fee">Approve fee</button>
               <button class="btn btn-primary btn-sm" id="btn-apply-listing">Apply for listing</button>
             </div>
-            <div id="step-apply-disabled" class="disabled-reason">
-              ${!f.mintedFeeToken ? 'Need 0.5 test IMD fee token to apply.' : !f.approvedFee ? 'Approve 0.5 test IMD fee to registry.' : ''}
-            </div>
+            <div id="step-apply-disabled" class="disabled-reason">${safe(f.note || applyStatus())}</div>
 
             <!-- Panel Preview -->
             <div id="apply-panel" style="margin-top: 24px;">
-              <label class="form-label">Oracle Panel Question Preview</label>
+              <label class="form-label">Oracle Panel Question Preview (read from the registry)</label>
               <div class="code-container" style="margin-top: 6px;">
-                <pre class="code-block" style="font-size: 0.8rem; white-space: pre-wrap; overflow-wrap: anywhere;"><code>${safe(panelQ)}</code></pre>
+                <pre class="code-block" id="apply-question" style="font-size: 0.8rem; white-space: pre-wrap; overflow-wrap: anywhere;"><code>${safe(f.question || 'Fill out the application form to read the exact question the registry will ask.')}</code></pre>
               </div>
             </div>
           </div>
@@ -740,138 +1259,151 @@
             <div class="dashboard-card" style="padding: 24px;">
               <h3 class="card-title" style="margin-bottom: 14px;">Open Questions</h3>
               <div style="display: flex; flex-direction: column; gap: 12px;">
-                ${Object.values(state.appliedProjects).map(ap => `
+                ${live.status !== 'ready' ? `<span class="secondary">${blockText()}</span>` : open.length ? open.map(p => `
                   <div style="border-bottom: 1px solid var(--border-subtle); padding-bottom: 8px;">
-                    <strong>${safe(ap.name)}</strong> (${safe(ap.state)})<br>
-                    <span class="secondary mono" style="font-size: 0.78rem;">${shortAddr(ap.address)}</span>
+                    <a href="#/projects/${p.address}"><strong>${safe(p.name || shortAddr(p.address))}</strong></a> (${ASK_NAMES[p.record.ask]})<br>
+                    <span class="secondary mono" style="font-size: 0.78rem;">${shortAddr(p.address)} &middot; ${fmtAgo(p.record.askedAt)}</span>
                   </div>
-                `).join('')}
-                <div style="border-bottom: 1px solid var(--border-subtle); padding-bottom: 8px;">
-                  <strong>TestIMD Hook</strong> (Applied)<br>
-                  <span class="secondary mono" style="font-size: 0.78rem;">0x2b69...1e82 &middot; 12 min ago</span>
-                </div>
+                `).join('') : '<span class="secondary" style="font-size: 0.84rem;">No open questions.</span>'}
               </div>
 
               <h3 class="card-title" style="margin-top: 24px; margin-bottom: 12px;">Recent Outcomes</h3>
               <p class="secondary" style="font-size: 0.84rem; line-height: 1.6;">
-                &bull; SelfCredit trial: Rejected (negative test case)<br>
-                &bull; TestSIMD Pool: Defended (bond to beneficiary)
+                ${live.status !== 'ready' ? blockText() : live.outcomes.length ? live.outcomes.slice(0, 6).map(o => {
+                  const p = live.projects.get(o.project);
+                  return `&bull; <a href="#/projects/${o.project}">${safe(p?.name || shortAddr(o.project))}</a>: ${o.kind}${o.detail ? ` (${safe(o.detail)})` : ''}`;
+                }).join('<br>') : 'No outcomes yet on the test run 4 registry.'}
               </p>
+
+              ${w && w.bondOwed > 0n ? `
+                <h3 class="card-title" style="margin-top: 24px; margin-bottom: 12px;">Bonds Owed to You</h3>
+                <p class="secondary" style="font-size: 0.84rem; margin-bottom: 10px;"><span class="mono">${fmtUnits(w.bondOwed, 18, 2)}</span> test IMD the token couldn't pay you at settlement.</p>
+                <button class="btn btn-secondary btn-sm" id="btn-claim-bond">Claim to this wallet</button>
+              ` : ''}
             </div>
           </div>
         </div>
       </div>
     `;
 
-    function validate(id, val) {
-      val = (val || '').trim();
-      if (id === 'project') {
-        if (!/^0x[a-fA-F0-9]{40}$/.test(val)) return 'not an address';
-        if (val.toLowerCase() === '0x0000000000000000000000000000000000000001') return 'no contract code';
-        if (val.toLowerCase() === ADDRESSES.TEST_SIMD.toLowerCase()) return 'Already listed';
-        if (val.toLowerCase() === ADDRESSES.TEST_IMD.toLowerCase()) return 'This project already has an open question';
-      }
-      if (id === 'name') {
-        if (!val) return 'name is required';
-        if (val.length > 48) return 'name too long (maximum 48 characters)';
-        if (val.includes('"')) return 'disallowed character: double quote';
-        if (val.includes('\\')) return 'disallowed character: backslash';
-        if (/[[\]]/.test(val)) return 'disallowed character: square bracket';
-        if (/[^\x20-\x7E]/.test(val)) return 'disallowed character: non-ASCII';
-      }
-      if (id === 'url') {
-        if (!val.startsWith('https://')) return 'URL must start with https://';
-        if (val.length < 12) return 'URL too short (minimum 12 characters)';
-        if (val.length > 200) return 'URL too long (maximum 200 characters)';
-      }
-      if (id === 'rate') {
-        const r = parseInt(val, 10);
-        if (isNaN(r) || r < 25 || r > 100) return 'rate must be between 25 to 100 bps';
-      }
-      if (id === 'beneficiary') {
-        if (!/^0x[a-fA-F0-9]{40}$/.test(val)) return 'not an address';
-        if (val.toLowerCase() === '0x0000000000000000000000000000000000000000') return 'beneficiary cannot be zero address';
-      }
-      return '';
-    }
+    const note = (text) => {
+      f.note = text;
+      const el = document.getElementById('step-apply-disabled');
+      if (el) el.textContent = text || applyStatus();
+    };
+
+    let previewTimer = null;
+    const preview = () => {
+      clearTimeout(previewTimer);
+      previewTimer = setTimeout(async () => {
+        const ids = ['project', 'name', 'url', 'rate', 'beneficiary'];
+        if (ids.some(id => validateApply(id, f[id]))) return;
+        try {
+          const ret = await ethCall(ADDRESSES.PROJECT_REGISTRY, encodeCall(SEL.applyQuestion, [
+            ['address', f.project.trim()], ['string', f.name.trim()], ['string', f.url.trim()], ['uint', f.rate.trim()], ['address', f.beneficiary.trim()]
+          ]));
+          f.question = decString(ret, Number(decUint(words(ret)[0])));
+          const q = document.querySelector('#apply-question code');
+          if (q) q.textContent = f.question;
+        } catch {}
+      }, 300);
+    };
 
     ['project', 'name', 'url', 'rate', 'beneficiary'].forEach((id) => {
       const el = document.getElementById(`apply-${id}`);
       const errEl = document.getElementById(`apply-${id}-error`);
-      if (el) {
-        if (f.errors[id]) {
-          el.setAttribute('aria-invalid', 'true');
-        }
-        el.addEventListener('blur', () => {
-          const err = validate(id, el.value);
-          f.errors[id] = err;
-          f[id] = el.value;
-          if (err) {
-            errEl.textContent = err;
-            el.setAttribute('aria-invalid', 'true');
-          } else {
-            errEl.textContent = '';
-            el.removeAttribute('aria-invalid');
-          }
-        });
+      if (!el) return;
+      if (f.errors[id]) el.setAttribute('aria-invalid', 'true');
+      el.addEventListener('input', () => { f[id] = el.value; });
+      el.addEventListener('blur', () => {
+        f[id] = el.value;
+        const err = validateApply(id, el.value);
+        f.errors[id] = err;
+        errEl.textContent = err;
+        if (err) el.setAttribute('aria-invalid', 'true');
+        else el.removeAttribute('aria-invalid');
+        preview();
+      });
+    });
+    preview();
+
+    document.getElementById('btn-get-feetoken')?.addEventListener('click', async () => {
+      try {
+        await ensureSepolia();
+        note('');
+        await sendTx(ADDRESSES.ORACLE_FEE_TOKEN, encodeCall(SEL.mint, [['address', state.account], ['uint', 10n * 10n ** 18n]]), 'Get 10 test IMD');
+      } catch (e) {
+        note(walletError(e));
       }
     });
 
-    document.getElementById('btn-get-feetoken')?.addEventListener('click', () => {
-      f.mintedFeeToken = true;
-      showToast('Minted 10 test IMD fee token!');
-      renderApply();
+    document.getElementById('btn-approve-fee')?.addEventListener('click', async () => {
+      try {
+        note('');
+        await sendTx(ADDRESSES.ORACLE_FEE_TOKEN, SEL.approve + encAddress(ADDRESSES.PROJECT_REGISTRY) + encUint(live.fee), 'Approve fee');
+      } catch (e) {
+        note(walletError(e));
+      }
     });
 
-    document.getElementById('btn-approve-fee')?.addEventListener('click', () => {
-      f.approvedFee = true;
-      showToast('Approved fee for ProjectRegistry!');
-      renderApply();
-    });
-
-    document.getElementById('btn-apply-listing')?.addEventListener('click', () => {
+    document.getElementById('btn-apply-listing')?.addEventListener('click', async () => {
       let hasErr = false;
       ['project', 'name', 'url', 'rate', 'beneficiary'].forEach((id) => {
-        const val = document.getElementById(`apply-${id}`)?.value || '';
-        const err = validate(id, val);
-        f.errors[id] = err;
-        if (err) hasErr = true;
+        f[id] = document.getElementById(`apply-${id}`)?.value || '';
+        f.errors[id] = validateApply(id, f[id]);
+        if (f.errors[id]) hasErr = true;
       });
       if (hasErr) {
         renderApply();
         return;
       }
+      try {
+        note('Checking the project on Sepolia...');
+        const project = f.project.trim();
+        const code = await rpc('eth_getCode', [project, 'latest']);
+        if (!code || code === '0x') throw new Error('That address has no contract code: only contracts can apply');
+        const rec = decodeRecord(await ethCall(ADDRESSES.PROJECT_REGISTRY, encodeCall(SEL.projectOf, [['address', project]])));
+        if (rec.listed) throw new Error('This project is already listed');
+        if (rec.ask !== 0) throw new Error('This project already has an open question');
+        await ensureSepolia();
+        await loadWallet();
+        if (!live.wallet || live.wallet.feeToken < live.fee || live.wallet.feeAllowance < live.fee) throw new Error(applyStatus());
+        note('');
+        await sendTx(ADDRESSES.PROJECT_REGISTRY, encodeCall(SEL.applyListing, [
+          ['address', project], ['string', f.name.trim()], ['string', f.url.trim()], ['uint', f.rate.trim()], ['address', f.beneficiary.trim()]
+        ]), 'Apply for listing');
+        note('Applied: the oracle panel usually answers within minutes.');
+      } catch (e) {
+        note(walletError(e));
+      }
+    });
 
-      state.appliedProjects[f.project.toLowerCase()] = {
-        address: f.project,
-        name: f.name,
-        state: 'Applied',
-        rateBps: parseInt(f.rate, 10),
-        beneficiary: f.beneficiary,
-        chain: 'Sepolia Testnet',
-        feeFunding: 'Contract fee split',
-        history: ['Applied'],
-        openQuestion: {
-          kind: 'Listing Application',
-          age: 'just now',
-          asker: shortAddr(state.account || '0xa987ef2aa4d2c0558cc6405f1a8253507274dc5d')
-        },
-        isRegistered: true
-      };
-
-      showToast('Application submitted to ProjectRegistry!');
-      renderApply();
+    document.getElementById('btn-claim-bond')?.addEventListener('click', async () => {
+      try {
+        await sendTx(ADDRESSES.PROJECT_REGISTRY, encodeCall(SEL.claimBond, [['address', state.account]]), 'Claim bond');
+      } catch (e) {
+        showToast(walletError(e));
+      }
     });
   }
 
   // --- Page: Leaderboard (#/leaderboard) ---
   function renderLeaderboard() {
     document.title = 'Leaderboard - imd/acc';
+    const points = new Map();
+    for (const s of live.stacks) {
+      if (isListedAt(s.project, s.block)) points.set(s.trader, (points.get(s.trader) || 0n) + s.imd);
+    }
+    const traders = [...points.entries()].sort((x, y) => (y[1] > x[1] ? 1 : y[1] < x[1] ? -1 : 0)).slice(0, 10);
+    const projects = allProjects().filter(p => p.stacked > 0n)
+      .sort((x, y) => (y.stacked > x.stacked ? 1 : y.stacked < x.stacked ? -1 : 0));
+    const mine = state.account ? (points.get(state.account) || 0n) : null;
+    const loading = live.status !== 'ready' ? `<tr><td colspan="3" class="secondary">${blockText()}</td></tr>` : '';
 
     appRoot.innerHTML = `
       <div class="page-view">
         <div class="page-header-block">
-          <div class="page-tag">Cumulative Points &middot; ${DATA_BLOCK_TEXT}</div>
+          <div class="page-tag">Cumulative Points &middot; ${blockText()}</div>
           <h1 class="page-title">Leaderboards</h1>
           <p class="page-desc">Points are earned at 1 point per IMD stacked across all listed participating projects.</p>
         </div>
@@ -889,28 +1421,18 @@
                   </tr>
                 </thead>
                 <tbody>
-                  <tr>
-                    <td><strong>#1</strong></td>
-                    <td><span class="mono">0x71C8...3B19</span></td>
-                    <td><strong class="mono" style="color: var(--accent-light);">1,450.00</strong></td>
-                  </tr>
-                  <tr>
-                    <td><strong>#2</strong></td>
-                    <td><span class="mono">0x882a...98e1</span></td>
-                    <td><strong class="mono" style="color: var(--accent-light);">980.00</strong></td>
-                  </tr>
-                  <tr>
-                    <td><strong>#3</strong></td>
-                    <td><span class="mono">0x4b91...6821</span></td>
-                    <td><strong class="mono" style="color: var(--accent-light);">320.00</strong></td>
-                  </tr>
-                  ${state.account ? `
+                  ${loading || (traders.length ? traders.map(([t, v], i) => `
+                    <tr${t === state.account ? ' style="background: var(--bg-elevated);"' : ''}>
+                      <td><strong>#${i + 1}</strong></td>
+                      <td>${addrLink(t)}${t === state.account ? ' (You)' : ''}</td>
+                      <td><strong class="mono" style="color: var(--accent-light);">${fmtUnits(v, 18, 2)}</strong></td>
+                    </tr>`).join('') : '<tr><td colspan="3" class="secondary">No points yet: only credits from projects listed on the test run 4 registry earn points.</td></tr>')}
+                  ${mine !== null && !loading && !points.has(state.account) ? `
                     <tr style="background: var(--bg-elevated);">
                       <td>-</td>
                       <td><span class="mono">${shortAddr(state.account)}</span> (You)</td>
-                      <td><strong class="mono" style="color: var(--accent-light);">${state.mockBalances.points.toFixed(2)}</strong></td>
-                    </tr>
-                  ` : ''}
+                      <td><strong class="mono" style="color: var(--accent-light);">${fmtUnits(mine, 18, 2)}</strong></td>
+                    </tr>` : ''}
                 </tbody>
               </table>
             </div>
@@ -928,16 +1450,15 @@
                   </tr>
                 </thead>
                 <tbody>
-                  <tr>
-                    <td><strong>PLEA</strong> (v10 Hook)</td>
-                    <td class="mono" style="color: var(--accent-light);">124,500 IMD</td>
-                    <td class="mono">42</td>
-                  </tr>
-                  <tr>
-                    <td><strong>PondPad</strong> (Planned)</td>
-                    <td class="mono">0 IMD</td>
-                    <td class="mono">0</td>
-                  </tr>
+                  ${loading || (projects.length ? projects.map(p => {
+                    const st = projectState(p);
+                    return `
+                      <tr>
+                        <td><a href="#/projects/${p.address}"><strong>${safe(p.name || shortAddr(p.address))}</strong></a> <span class="pill ${st.cls}">${st.label}</span></td>
+                        <td class="mono" style="color: var(--accent-light);">${fmtUnits(p.stacked, 18, 2)} IMD</td>
+                        <td class="mono">${p.traders.size}</td>
+                      </tr>`;
+                  }).join('') : '<tr><td colspan="3" class="secondary">No cashback credited yet.</td></tr>')}
                 </tbody>
               </table>
             </div>
@@ -1647,32 +2168,45 @@ error ZeroShares();`;
     });
 
     // Wallet Connect
-    const btnWallet = document.getElementById('btn-wallet');
-    btnWallet?.addEventListener('click', async () => {
-      if (typeof window.ethereum === 'undefined') {
-        showToast('No Web3 wallet detected. Exploring in demo mode!');
-        return;
-      }
+    document.getElementById('btn-wallet')?.addEventListener('click', async () => {
       try {
-        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-        if (accounts && accounts[0]) {
-          state.account = accounts[0];
-          document.getElementById('wallet-label').textContent = shortAddr(state.account);
-          btnWallet.classList.remove('btn-secondary');
-          btnWallet.classList.add('btn-primary');
-          showToast(`Connected: ${shortAddr(state.account)}`);
-          render();
-        }
+        await connectWallet();
+        showToast(`Connected: ${shortAddr(state.account)}`);
+        await loadWallet();
+        render(true);
       } catch (err) {
-        showToast('Wallet connection rejected');
+        showToast(walletError(err));
       }
     });
 
-    // Hashchange listener
-    window.addEventListener('hashchange', render);
+    if (window.ethereum?.on) {
+      window.ethereum.on('accountsChanged', async (accounts) => {
+        setAccount(accounts && accounts[0]);
+        await loadWallet();
+        render(true);
+      });
+    }
 
-    // Initial render
+    // Reconnect silently if the site was already allowed.
+    if (window.ethereum) {
+      window.ethereum.request({ method: 'eth_accounts' }).then(async (accounts) => {
+        if (accounts && accounts[0]) {
+          setAccount(accounts[0]);
+          await loadWallet();
+          render(true);
+        }
+      }).catch(() => {});
+    }
+
+    // Hashchange listener
+    window.addEventListener('hashchange', () => render());
+
+    // Initial render, then fill in what Sepolia says, and keep it fresh while the tab is visible.
     render();
+    refreshLive();
+    setInterval(() => {
+      if (document.visibilityState === 'visible' && !state.busy) refreshLive(true);
+    }, 60000);
   }
 
   document.addEventListener('DOMContentLoaded', init);
