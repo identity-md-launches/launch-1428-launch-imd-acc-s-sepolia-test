@@ -1530,14 +1530,16 @@
   const INTEGRATION_SNIPPET = `// Once: let the Stacker pull IMD from your contract.
 IERC20(imd).approve(address(stacker), type(uint256).max);
 
-// On each trade, for the real trader (hookData, else sender).
+// On each trade, for the real trader: valid hookData, else the router's
+// msgSender(), else sender only if it has no code. Never pay a router.
 // Your rate: 25-100 bps, out of the fee you already charge.
 uint256 cashback = imdSideAmount * RATE_BPS / 10_000;
 
-// Check gas first, so no wallet estimate skips the cashback.
-require(gasleft() >= CREDIT_GAS, "gas for cashback");
+// Check gas first, so no wallet estimate skips the cashback; 350k covers
+// even the Stacker's first-ever credit, 60k more is for the fallback.
+require(gasleft() >= 410_000, "imd/acc: insufficient gas");
 
-try stacker.credit(trader, cashback) {
+try stacker.credit{gas: 350_000}(trader, cashback) {
     // the trader now holds the sIMD
 } catch {
     // plain IMD instead: the trade never reverts
@@ -1700,10 +1702,10 @@ error ZeroShares();`;
             <div class="docs-grid">
               <div class="doc-rule-card"><span class="rule-number">1</span><div class="rule-content"><h4>Fund it from your fee</h4><p>Pick a rate from 0.25% to 1% and take it on the IMD side of the trade, out of the fee you already charge. The part of your fee that leaves you must be at least as large as the cashback (the <a href="#/docs/fee-guard">fee guard</a>).</p></div></div>
               <div class="doc-rule-card"><span class="rule-number">2</span><div class="rule-content"><h4>Never break a trade</h4><p>Wrap <code>credit</code> in <code>try/catch</code> and pay plain IMD to the trader if it fails.</p></div></div>
-              <div class="doc-rule-card"><span class="rule-number">3</span><div class="rule-content"><h4>Pay the real trader</h4><p>Read it from the router's <code>hookData</code>, fall back to <code>sender</code>, never use <code>tx.origin</code>.</p></div></div>
-              <div class="doc-rule-card"><span class="rule-number">4</span><div class="rule-content"><h4>Check gas first</h4><p>Require enough gas for <code>credit</code> up front with <code>gasleft()</code>. Otherwise a wallet's gas estimate picks the cheaper path without cashback.</p></div></div>
-              <div class="doc-rule-card"><span class="rule-number">5</span><div class="rule-content"><h4>Budget the gas</h4><p>About 136k gas for a new trader and 102k for a repeat one on mainnet (whole transactions). Wallets should send estimates &times; 1.3. See <a href="#/docs/gas">Gas &amp; costs</a>.</p></div></div>
-              <div class="doc-rule-card"><span class="rule-number">6</span><div class="rule-content"><h4>Uniswap v4 hooks</h4><p>Include the <code>afterSwap</code> logic Uniswap's frontend whitelisting expects, support the router's <code>msgSender</code>, and warn users about copycat pools.</p></div></div>
+              <div class="doc-rule-card"><span class="rule-number">3</span><div class="rule-content"><h4>Pay the real trader</h4><p>Valid router <code>hookData</code> first; else the router's <code>msgSender()</code> during the swap; <code>sender</code> only if it has no code. Never <code>tx.origin</code>, never a router: in a Uniswap v4 hook <code>sender</code> is usually the router, and anyone can sweep what it holds. If no trader can be resolved, skip the cashback without blocking the trade.</p></div></div>
+              <div class="doc-rule-card"><span class="rule-number">4</span><div class="rule-content"><h4>Check gas first</h4><p>Require <code>gasleft() &gt;= 410,000</code> before calling <code>credit{gas: 350,000}</code>, outside the <code>try/catch</code>. Otherwise a wallet's gas estimate picks the cheaper path without cashback.</p></div></div>
+              <div class="doc-rule-card"><span class="rule-number">5</span><div class="rule-content"><h4>Budget the gas</h4><p>About 136k gas for a new trader and 102k for a repeat one on mainnet (whole transactions); the Stacker's first-ever credit about 232k, as it also approves the vault. A cap near the new-trader figure fails that first credit every time. See <a href="#/docs/gas">Gas &amp; costs</a>.</p></div></div>
+              <div class="doc-rule-card"><span class="rule-number">6</span><div class="rule-content"><h4>Uniswap v4 hooks</h4><p>Include the <code>afterSwap</code> logic Uniswap's frontend whitelisting expects, resolve the router's <code>msgSender()</code> (rule 3, also with empty <code>hookData</code>), and warn users about copycat pools.</p></div></div>
               <div class="doc-rule-card"><span class="rule-number">7</span><div class="rule-content"><h4>Test the failure path</h4><p>On Sepolia, TestSIMD's owner can pause it; your hook should then pay plain IMD. See <a href="#/docs/testing">Testing on Sepolia</a>.</p></div></div>
             </div>
             <h2 id="approve">Approve once</h2>

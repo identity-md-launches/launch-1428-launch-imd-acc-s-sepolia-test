@@ -9,7 +9,7 @@ The [README](../README.md) is the overview. This file keeps the design detail an
 | `Stacker` (shared contract) | `credit(trader, imdAmount)`: pulls IMD from the caller and calls `sIMD.deposit(amount, trader)`. The caller is the project. Emits `Stacked(project, trader, imd, shares)` and keeps per-project totals on chain. No owner; the IMD and sIMD addresses are immutable. Deposits on every credit. |
 | Integration rule | The project wraps `credit` in `try/catch`. If it fails (vault paused, anything else), the hook sends the cashback to the trader as plain IMD instead, so **a trade never reverts because of imd/acc**. |
 | Drop-in hook (planned) | For IMD pools without their own hook. Takes the cashback in IMD in `afterSwap` and calls `credit`. Includes the `afterSwap` logic that Uniswap's frontend whitelisting needs (a btc/acc lesson). |
-| Trader identity | The router passes the real trader in `hookData`. Fall back to `sender`; never use `tx.origin`. |
+| Trader identity | Valid router `hookData`, else the router's active `msgSender()`, else `sender` only if it has no code; never `tx.origin`. Validate recipients and never pay an unresolved forwarding router. See README rule 3 for fallback and unsupported routes. |
 | Site | "Your stack" (sIMD from cashback, per project, and its IMD value now), plus leaderboards for top stackers and top projects. |
 
 ## Which projects earn points

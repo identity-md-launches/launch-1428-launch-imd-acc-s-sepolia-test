@@ -29,9 +29,10 @@ interface IStacker {
     function credit(address trader, uint256 imdAmount) external returns (uint256 shares);
 }
 
-// In your pool hook's afterSwap:
+// In your pool hook's afterSwap, with the real trader resolved (rule 2):
 uint256 cashback = imdSideAmount * RATE_BPS / 10_000; // 25-100 bps
-try stacker.credit(trader, cashback) returns (uint256 shares) {
+require(gasleft() >= 410_000, "imd/acc: insufficient gas"); // 350k covers the first-ever credit
+try stacker.credit{gas: 350_000}(trader, cashback) returns (uint256 shares) {
     // trader holds sIMD shares
 } catch {
     // Fallback: pay plain IMD so trades never revert
@@ -41,6 +42,6 @@ try stacker.credit(trader, cashback) returns (uint256 shares) {
 
 MUST rules:
 1. Call credit from the trading contract itself, which holds the IMD and approved the Stacker.
-2. Only inside a trade, for that trade's real trader (from hookData).
+2. Only inside a trade, for that trade's real trader: valid router hookData, else the router's msgSender(), else sender only if it has no code. Never tx.origin, never pay a router (in a Uniswap v4 hook sender is usually the router).
 3. Rate must be between 25 and 100 bps (0.25% - 1%).
 4. Always wrap in try/catch and pay plain IMD if it fails.
