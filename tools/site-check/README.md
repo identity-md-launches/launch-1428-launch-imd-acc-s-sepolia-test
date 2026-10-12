@@ -25,7 +25,7 @@ node refresh-bug.mjs            # does a data refresh remove the Apply question 
 
 ## Listing trial through the root site
 
-`trial.mjs` runs one step of the registry trial through the GitHub Pages site (https://khaed1.github.io/imd-acc/), with a wallet that signs as the test wallet `0x4b91…6821` (key from `PONDPAD_TESTNET_KEY`, never printed). The page finds it as `window.ethereum`, like MetaMask or Rabby.
+`trial.mjs` runs one step of the registry trial through the GitHub Pages site (https://imdacc.fun/), with a wallet that signs as the test wallet `0x4b91…6821` (key from `PONDPAD_TESTNET_KEY`, never printed). The page finds it as `window.ethereum`, like MetaMask or Rabby.
 
 ```sh
 TARGET=http://127.0.0.1:8545 node trial.mjs plea        # rehearsal on the fork: the page's RPCs go there too

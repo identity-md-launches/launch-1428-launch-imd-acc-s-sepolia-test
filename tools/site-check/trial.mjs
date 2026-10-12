@@ -13,7 +13,7 @@ const STEP = process.argv[2];
 const TARGET = process.env.TARGET || "https://ethereum-sepolia-rpc.publicnode.com";
 const LIVE = !/127\.0\.0\.1|localhost/.test(TARGET);
 if (LIVE && process.env.LIVE_OK !== "1") throw new Error("live Sepolia needs LIVE_OK=1");
-const SITE = process.env.SITE || "https://khaed1.github.io/imd-acc/";
+const SITE = process.env.SITE || "https://imdacc.fun/";
 const ACCOUNT = "0x4b91078b2374c956a65f7af0999cae0a935e6821";
 const HOOK = "0x2d5a03d5bab98a4a435edad11813373963bca8cc";
 const SC = "0x3d1778be5f9e55f0df35acaf64a13efe2fe81488";
