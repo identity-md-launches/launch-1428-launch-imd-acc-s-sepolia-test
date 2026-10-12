@@ -12,5 +12,18 @@
       "https://ethereum-sepolia-rpc.publicnode.com",
       "https://sepolia.drpc.org"
     ]
+  },
+  {
+    "name": "ethereum",
+    "id": 1,
+    "stacker": "0x06909f672301f28a810f78cfe7a754851269f4f0",
+    "stackerBlock": 26176629,
+    "registry": null,
+    "registryBlock": null,
+    "confirmations": 12,
+    "rpcs": [
+      "https://ethereum-rpc.publicnode.com",
+      "https://eth.drpc.org"
+    ]
   }
 ]

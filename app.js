@@ -20,6 +20,7 @@
     INTAKE_V2: '0xa43e6f75ee006411f79ac1c84120606c2330de82',
     MAINNET_IMD: '0xd34a99bc0f67ae1bbd63c660e6d0b0dd03e263b7',
     MAINNET_SIMD: '0x9efa934d9fad4ae28c998a40195646b965a97247',
+    MAINNET_STACKER: '0x06909f672301f28a810f78cfe7a754851269f4f0', // launch #1409
     ROBINHOOD_IMD: '0x5f7bb59365ce557c26dbcaa4ee9d39a4b95b7127'
   };
 
@@ -1561,6 +1562,7 @@ event Stacked(
 );
 
 error ZeroTrader();
+error InvalidTrader(); // mainnet: the Stacker, the vault or the IMD token as trader
 error AssetMismatch(address vaultAsset, address imd);
 error ZeroShares();`;
 
@@ -1588,7 +1590,7 @@ error ZeroShares();`;
               <li><strong>sIMD vault</strong>: IMD's own ERC-4626 staking vault. imd/acc only deposits into it.</li>
             </ul>
             <h2 id="status">Where it stands</h2>
-            <p>The Stacker and the ProjectRegistry are live on Sepolia (latest: test run 4, launch #1378). The mainnet Stacker launch is ready, against the real IMD and sIMD. See <a href="#/docs/contracts">Contracts</a> for every address and <a href="#/docs/roadmap">Roadmap</a> for what comes next.</p>
+            <p>The Stacker and the ProjectRegistry are live on Sepolia (latest: test run 4, launch #1378). The Stacker is live on Ethereum mainnet (launch #1409), against the real IMD and sIMD. See <a href="#/docs/contracts">Contracts</a> for every address and <a href="#/docs/roadmap">Roadmap</a> for what comes next.</p>
             <div class="docs-callout"><p>imd/acc is inspired by TokenWorks' btc/acc: the same idea of turning trading activity into a growing stack, here in staked IMD.</p></div>`
         },
         {
@@ -1803,7 +1805,7 @@ error ZeroShares();`;
           body: `
             <h2 id="sepolia">Sepolia (chain 11155111)</h2>
             <div class="contracts-grid">
-              ${docContract('Stacker', 'Live', 'pill-live', ADDRESSES.STACKER, 'The cashback funnel every project calls. The same code as the mainnet Stacker (launch #1294).', EXPLORER.sepolia)}
+              ${docContract('Stacker', 'Live', 'pill-live', ADDRESSES.STACKER, 'The cashback funnel every project calls (launch #1294). The mainnet Stacker adds one check: it refuses the Stacker, the vault and the IMD token as the trader.', EXPLORER.sepolia)}
               ${docContract('ProjectRegistry', 'Live', 'pill-live', ADDRESSES.PROJECT_REGISTRY, 'The current registry (test run 4, launch #1378): rules v2, one handoff per day, owed bonds.', EXPLORER.sepolia)}
               ${docContract('TestIMD', 'Sepolia', 'pill-live', ADDRESSES.TEST_IMD, 'Test IMD with a faucet: 10,000 tIMD per address every 24 hours.', EXPLORER.sepolia)}
               ${docContract('TestSIMD vault', 'Sepolia', 'pill-live', ADDRESSES.TEST_SIMD, 'A copy of StakedIMD whose owner can pause it, to test fallbacks.', EXPLORER.sepolia)}
@@ -1814,7 +1816,7 @@ error ZeroShares();`;
             <div class="contracts-grid">
               ${docContract('IMD', 'Mainnet', 'pill-live', ADDRESSES.MAINNET_IMD, 'Standard 18-decimal ERC-20 (a LayerZero OFT), no transfer fee.', EXPLORER.mainnet)}
               ${docContract('sIMD vault', 'Mainnet', 'pill-live', ADDRESSES.MAINNET_SIMD, 'ERC-4626 staking vault. Owner renounced: nobody can pause it or sweep its funds.', EXPLORER.mainnet)}
-              ${docContract('Stacker', 'Pending', 'pill-planned', '', 'Launch ready: the same contract as on Sepolia, against the real IMD and sIMD.', '')}
+              ${docContract('Stacker', 'Live', 'pill-live', ADDRESSES.MAINNET_STACKER, 'Launch #1409, block 26,176,629: the cashback funnel against the real IMD and sIMD, audited by the IMD swarm. Source verified on Sourcify.', EXPLORER.mainnet)}
               ${docContract('ProjectRegistry', 'Planned', 'pill-planned', '', 'A later launch: the Sepolia registry\'s code, with a 20 IMD bond and a 7-day cooldown.', '')}
             </div>
             <h2 id="earlier">Earlier Sepolia deployments</h2>
@@ -1835,6 +1837,7 @@ error ZeroShares();`;
             <p>Pulls <code>imdAmount</code> IMD from <code>msg.sender</code> (the project) and calls <code>sIMD.deposit(imdAmount, trader)</code>. Returns the shares minted to the trader.</p>
             ${docTable(['Case', 'Result'], [
               ['<code>trader</code> is zero', 'reverts <code>ZeroTrader</code>'],
+              ['<code>trader</code> is the Stacker, the vault or the IMD token', 'reverts <code>InvalidTrader</code> on mainnet: shares there could never move (the Sepolia Stacker predates this check)'],
               ['<code>imdAmount</code> is zero', 'returns 0: no transfer, no event, no state change'],
               ['first non-zero credit ever', 'checks <code>sIMD.asset() == IMD</code> (<code>AssetMismatch</code> otherwise) and approves the vault once; a failed credit rolls both back'],
               ['the vault mints 0 shares', 'reverts <code>ZeroShares</code>'],
@@ -1890,7 +1893,7 @@ error ZeroShares();`;
             ${docTable(['File', 'What it holds'], [
               ['<a href="./data/v1/index.json"><code>/data/v1/index.json</code></a>', 'The chains that have a file, with each file\'s last block. Start here.'],
               ['<a href="./data/v1/sepolia.json"><code>/data/v1/sepolia.json</code></a>', 'Sepolia: the test run 2 Stacker and the test run 4 registry.'],
-              ['<code>/data/v1/ethereum.json</code>', 'Ethereum mainnet, once the mainnet Stacker is live.']
+              ['<a href="./data/v1/ethereum.json"><code>/data/v1/ethereum.json</code></a>', 'Ethereum mainnet: the Stacker (launch #1409). No registry yet, so no points.']
             ])}
             <h2 id="rules">What the numbers mean</h2>
             <ul>
@@ -1990,7 +1993,7 @@ const points = me ? Number(BigInt(me.points) / 10n ** 14n) / 1e4 : 0;`, 'code-da
             <ol>
               <li><strong>Sepolia test runs</strong> (done): the Stacker and the ProjectRegistry, now at test run 4 (launch #1378).</li>
               <li><strong>Live listing trial</strong> on Sepolia (done, 2026-10-12): PLEA listed by the oracle panel, a negative case rejected, and a challenge against PLEA defended.</li>
-              <li><strong>The Stacker on Ethereum mainnet</strong>, with a full IMD swarm audit. PLEA mainnet uses its address.</li>
+              <li><strong>The Stacker on Ethereum mainnet</strong> (done, 2026-10-12, launch #1409), with a full IMD swarm audit. PLEA mainnet uses its address.</li>
               <li><strong>Indexer and mainnet dashboard</strong>: each trader's cashback, points and value, and the leaderboards.</li>
               <li><strong>ProjectRegistry on mainnet</strong>: a 20 IMD challenge bond and a 7-day cooldown.</li>
               <li><strong>Multichain</strong>: Robinhood Chain first, then Base and Arbitrum.</li>

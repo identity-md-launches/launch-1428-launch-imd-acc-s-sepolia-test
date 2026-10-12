@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| **Status** | Sepolia live: the Stacker (test run 2, launch #1294) and the ProjectRegistry the mainnet one will use (test run 4, launch #1378). Live listing trial done on 2026-10-12: PLEA listed by a signed yes (11 of 12) and then defended against a challenge (11 of 11, bond to its beneficiary); the negative case rejected 12 to 0 ([history, section 29](docs/history.md#29-live-listing-trial-on-the-test-run-4-registry-plea-listed-and-defended-2026-10-12)). Next: the mainnet Stacker. |
+| **Status** | **Ethereum mainnet: the Stacker is live** at [`0x0690…f4f0`](https://etherscan.io/address/0x06909f672301f28a810f78cfe7a754851269f4f0) (launch #1409). Sepolia live: the Stacker (test run 2, launch #1294) and the ProjectRegistry the mainnet one will use (test run 4, launch #1378). Live listing trial done on 2026-10-12: PLEA listed by a signed yes (11 of 12) and then defended against a challenge (11 of 11, bond to its beneficiary); the negative case rejected 12 to 0 ([history, section 29](docs/history.md#29-live-listing-trial-on-the-test-run-4-registry-plea-listed-and-defended-2026-10-12)). Next: PLEA mainnet integrates; then the mainnet registry. |
 | **Website** | https://imdacc.fun (GitHub Pages from this repository; the old https://khaed1.github.io/imd-acc/ redirects there: live Sepolia data, real wallet transactions on test run 4, docs). Older IMD-hosted pages show older registries: https://imd-acc-sepolia-test-run-2.sites.imd.fun/ (test run 2) and https://imd-acc-sepolia-test-run.site.identitymd.eth.limo (the first run). |
 | **Contract code** | [`src/Stacker.sol`](src/Stacker.sol) (the cashback funnel) and [`src/ProjectRegistry.sol`](src/ProjectRegistry.sol) (the oracle-decided project list) in this repository. The first Sepolia launch's code, built and deployed by the [IMD swarm](https://imd.fun), is in the [launch-1129 repository](https://github.com/identity-md-launches/launch-1129-build-imd-acc-sepolia-test). |
 
@@ -113,13 +113,13 @@ The registry `main` will use on mainnet, now with owed bonds (a bond the token r
 |---|---|---|
 | ProjectRegistry | [`0xfe4470a42df0e77f7efb1b2e8135134a9cd7d102`](https://sepolia.etherscan.io/address/0xfe4470a42df0e77f7efb1b2e8135134a9cd7d102) | Stacker `0x0457…314d`, fee `ORACLE_FEE()` 0.5 test IMD of `0x44a1…f89a` (read live from Intake v2), challenge bond 5 test IMD, cooldown 1 hour, panel 15/11, 1-day expiry, beneficiary handoff at most once per day, owed bonds claimed with `claimBond(to)`. Challenges use `challengeForBeneficiary(project, reason, expectedBeneficiary)`. |
 
-### Ethereum mainnet (next)
+### Ethereum mainnet (live, launch #1409, block 26,176,629)
 
 | Contract | Address | Notes |
 |---|---|---|
 | IMD | [`0xd34a99bc0f67ae1bbd63c660e6d0b0dd03e263b7`](https://etherscan.io/address/0xd34a99bc0f67ae1bbd63c660e6d0b0dd03e263b7) | Standard 18-decimal ERC-20 (a LayerZero OFT), no transfer fee. |
 | sIMD | [`0x9efa934d9fad4ae28c998a40195646b965a97247`](https://etherscan.io/address/0x9efa934d9fad4ae28c998a40195646b965a97247) | ERC-4626 staking vault. Owner renounced, so nobody can pause it or sweep its funds. |
-| Stacker | not deployed yet | Launch ready: [`jobs/4-mainnet-launch.md`](jobs/4-mainnet-launch.md), deploying [`src/Stacker.sol`](src/Stacker.sol) as listed in [`launch.json`](launch.json). |
+| Stacker | [`0x06909f672301f28a810f78cfe7a754851269f4f0`](https://etherscan.io/address/0x06909f672301f28a810f78cfe7a754851269f4f0) | **Live** since 2026-10-12 (launch #1409, tx `0xb28ee85584dfbb45a1b2e3fd96441b7206ddca9c90767579c771943866dec28e`), source verified on Sourcify. The IMD swarm's audit added one check to `credit`: the Stacker, the vault and the IMD token are refused as the trader (`InvalidTrader`), since shares there could never move. Its code is in the [launch-1409 repository](https://github.com/identity-md-launches/launch-1409-launch-imd-acc-ethereum-mainnet) (commit `e07f102f`); `src/Stacker.sol` here doesn't have that check yet ([history, section 33](docs/history.md#33-mainnet-stacker-live-launch-1409-2026-10-12)). The vault isn't approved yet: the first credit does it and costs about 232k gas. |
 
 ## Points
 
