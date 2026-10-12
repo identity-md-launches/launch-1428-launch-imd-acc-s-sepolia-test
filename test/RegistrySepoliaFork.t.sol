@@ -24,7 +24,8 @@ contract RegistrySepoliaForkTest is Test {
     uint256 internal constant KEY = 0xA11CE;
 
     ProjectRegistry internal reg;
-    address internal applicant = makeAddr("applicant");
+    /// @dev PLEA's hook reports the test wallet as its `owner()`, and only the owner may apply for it.
+    address internal applicant = 0x4b91078b2374c956A65F7Af0999CaE0a935E6821;
     bool internal forked;
 
     function setUp() public {
@@ -45,6 +46,7 @@ contract RegistrySepoliaForkTest is Test {
     }
 
     function test_sepolia_applyPaysTheRealIntake_thenAnswerLists() public onlyFork {
+        uint256 before_ = ITestIMD(ORACLE_IMD).balanceOf(applicant);
         vm.recordLogs();
         vm.prank(applicant);
         uint256 g = gasleft();
@@ -52,7 +54,7 @@ contract RegistrySepoliaForkTest is Test {
             reg.applyListing(PLEA_HOOK, "PLEA", "https://github.com/khaed1/plea", 50, applicant);
         emit log_named_uint("applyListing gas (fork, excl. 21k base)", g - gasleft());
 
-        assertEq(ITestIMD(ORACLE_IMD).balanceOf(applicant), 9.5e18, "0.5 test IMD paid");
+        assertEq(before_ - ITestIMD(ORACLE_IMD).balanceOf(applicant), 0.5e18, "0.5 test IMD paid");
         assertEq(ITestIMD(ORACLE_IMD).balanceOf(address(reg)), 0);
         (address payer, address target, bytes4 sel, bool completed) = IIntake(INTAKE).requests(id);
         assertEq(payer, address(reg));
