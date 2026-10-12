@@ -20,7 +20,8 @@
 8. [Roadmap](#roadmap)
 9. [Repository layout](#repository-layout)
 10. [Build and test](#build-and-test)
-11. [Credits](#credits)
+11. [Data API](#data-api)
+12. [Credits](#credits)
 
 ## Why imd/acc
 
@@ -215,6 +216,7 @@ docs/
                           decisions, open questions, launch settings, btc/acc lessons
   history.md              what happened so far, with the checks and transactions behind it
   panel-rules-v2.md       clearer oracle panel rules for the mainnet registry (draft, rehearsed on Sepolia)
+  data-api.md             the data API: JSON snapshot files, their format and stability promise
   explainer.html          a one-page explainer for traders and projects
 jobs/                     IMD swarm job prompts, in order
   1-sepolia-launch.md     the Sepolia launch (done, launch #1129)
@@ -230,6 +232,7 @@ listings/sepolia.json     the list-file fallback (test run 2 uses the ProjectReg
 .github/ISSUE_TEMPLATE/   the "List my project" application form
 docs/plea-test-run-2.md   what the PLEA session needs for test run 2: addresses, crediting, applying
 tools/site-check/         browser checks for the test site (live reads, transactions on a local fork)
+tools/snapshot/           the data API builder (docs/data-api.md) and its fork test
 NEXT_SESSION.md           the brief for the next working session
 ```
 
@@ -250,6 +253,10 @@ The mainnet fork tests check the live vault's facts (asset, renounced owner, not
 **Branches:** `main` holds the mainnet manifest (the Stacker only). The `sepolia` branch differs only in `launch.json`: the same Stacker wired to the live Sepolia TestIMD and TestSIMD, plus the ProjectRegistry.
 
 **Working with IMD:** jobs are paid in IMD (0.5 IMD each) from the owner's wallet. Run the free `POST https://api.imd.fun/requests/check` before paying. Set hosting only with the job's `ipfs` field, never in the prompt text, or the agent tries to publish the site itself and blocks. Docs: https://imd.fun/docs.
+
+## Data API
+
+Read-only JSON files with every chain's cashback and points, rebuilt from the chain about every 15 minutes and published with the website: start at https://imdacc.fun/data/v1/index.json. Points follow the listing periods of the chain's registry, and every file is checked against the Stacker's own totals before it is published. Format, rules and stability promise: [docs/data-api.md](docs/data-api.md). Builder: [`tools/snapshot/`](tools/snapshot/build.mjs).
 
 ## Credits
 

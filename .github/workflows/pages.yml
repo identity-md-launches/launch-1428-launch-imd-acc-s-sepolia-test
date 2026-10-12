@@ -5,6 +5,9 @@ on:
     branches:
       - main
   workflow_dispatch:
+  # Rebuilds the data snapshot (docs/data-api.md) about every 15 minutes, off the hour's rush.
+  schedule:
+    - cron: "7,22,37,52 * * * *"
 
 permissions:
   contents: read
@@ -27,6 +30,15 @@ jobs:
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # Recomputed from the chain on every run; if a chain fails, the published file is kept.
+      - name: Build data snapshot
+        run: node tools/snapshot/build.mjs --out data/v1 --fallback https://imdacc.fun/data/v1/
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
