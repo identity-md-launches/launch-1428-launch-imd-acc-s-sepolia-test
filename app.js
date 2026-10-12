@@ -1390,13 +1390,24 @@
   // --- Page: Leaderboard (#/leaderboard) ---
   function renderLeaderboard() {
     document.title = 'Leaderboard - imd/acc';
+    // Trader and project points count the same credits: those inside a listing period.
     const points = new Map();
+    const projectPoints = new Map(); // project -> { points, traders }
     for (const s of live.stacks) {
-      if (isListedAt(s.project, s.block)) points.set(s.trader, (points.get(s.trader) || 0n) + s.imd);
+      if (!isListedAt(s.project, s.block)) continue;
+      points.set(s.trader, (points.get(s.trader) || 0n) + s.imd);
+      const key = s.project.toLowerCase();
+      const e = projectPoints.get(key) || { points: 0n, traders: new Set() };
+      e.points += s.imd;
+      e.traders.add(s.trader);
+      projectPoints.set(key, e);
     }
     const traders = [...points.entries()].sort((x, y) => (y[1] > x[1] ? 1 : y[1] < x[1] ? -1 : 0)).slice(0, 10);
-    const projects = allProjects().filter(p => p.stacked > 0n)
-      .sort((x, y) => (y.stacked > x.stacked ? 1 : y.stacked < x.stacked ? -1 : 0));
+    const projects = [...projectPoints.entries()]
+      .map(([key, e]) => ({ p: live.projects.get(key), ...e }))
+      .filter(x => x.p)
+      .sort((x, y) => (y.points > x.points ? 1 : y.points < x.points ? -1 : 0))
+      .slice(0, 10);
     const mine = state.account ? (points.get(state.account) || 0n) : null;
     const loading = live.status !== 'ready' ? `<tr><td colspan="3" class="secondary">${blockText()}</td></tr>` : '';
 
@@ -1405,7 +1416,7 @@
         <div class="page-header-block">
           <div class="page-tag">Cumulative Points &middot; ${blockText()}</div>
           <h1 class="page-title">Leaderboards</h1>
-          <p class="page-desc">Points are earned at 1 point per IMD stacked across all listed participating projects.</p>
+          <p class="page-desc">1 point per IMD stacked by a listed project, counted from the block it was listed. A project's points are the IMD its traders stacked while it was listed.</p>
         </div>
 
         <div class="grid-2">
@@ -1439,26 +1450,26 @@
           </div>
 
           <div class="dashboard-card">
-            <h3 class="card-title" style="margin-bottom: 16px;">Top Projects by Volume</h3>
+            <h3 class="card-title" style="margin-bottom: 16px;">Top Projects</h3>
             <div class="projects-table-wrap">
               <table class="data-table">
                 <thead>
                   <tr>
                     <th>Project</th>
-                    <th>IMD Stacked</th>
+                    <th>Points</th>
                     <th>Traders</th>
                   </tr>
                 </thead>
                 <tbody>
-                  ${loading || (projects.length ? projects.map(p => {
+                  ${loading || (projects.length ? projects.map(({ p, points: v, traders: t }) => {
                     const st = projectState(p);
                     return `
                       <tr>
                         <td><a href="#/projects/${p.address}"><strong>${safe(p.name || shortAddr(p.address))}</strong></a> <span class="pill ${st.cls}">${st.label}</span></td>
-                        <td class="mono" style="color: var(--accent-light);">${fmtUnits(p.stacked, 18, 2)} IMD</td>
-                        <td class="mono">${p.traders.size}</td>
+                        <td class="mono" style="color: var(--accent-light);"><strong>${fmtUnits(v, 18, 2)}</strong></td>
+                        <td class="mono">${t.size}</td>
                       </tr>`;
-                  }).join('') : '<tr><td colspan="3" class="secondary">No cashback credited yet.</td></tr>')}
+                  }).join('') : '<tr><td colspan="3" class="secondary">No project points yet: a project earns points for the IMD its traders stack while it is listed.</td></tr>')}
                 </tbody>
               </table>
             </div>
@@ -1946,7 +1957,7 @@ error ZeroShares();`;
           body: `
             <ol>
               <li><strong>Sepolia test runs</strong> (done): the Stacker and the ProjectRegistry, now at test run 4 (launch #1378).</li>
-              <li><strong>Live listing trial</strong> on Sepolia: a real application, a listing and a challenge.</li>
+              <li><strong>Live listing trial</strong> on Sepolia (done, 2026-10-12): PLEA listed by the oracle panel, a negative case rejected, and a challenge against PLEA defended.</li>
               <li><strong>The Stacker on Ethereum mainnet</strong>, with a full IMD swarm audit. PLEA mainnet uses its address.</li>
               <li><strong>Indexer and mainnet dashboard</strong>: each trader's cashback, points and value, and the leaderboards.</li>
               <li><strong>ProjectRegistry on mainnet</strong>: a 20 IMD challenge bond and a 7-day cooldown.</li>
