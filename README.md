@@ -104,6 +104,14 @@ The registry `main` will use on mainnet (panel rules version 2, one beneficiary 
 
 The test run 2 site still reads test run 2's registry.
 
+### Sepolia test run 4 (live, launch #1378, block 11,897,725)
+
+The registry `main` will use on mainnet, now with owed bonds (a bond the token refuses to pay never holds a question open; its recipient takes it with `claimBond(to)`), with Sepolia settings, wired to test run 2's Stacker above. Code: [launch-1378 repository](https://github.com/identity-md-launches/launch-1378-launch-imd-acc-s-fourth-last), commit `666e7b63`; its `src/` is byte for byte `main`'s ([history, section 26](docs/history.md#26-sepolia-test-run-4-live-launch-1378-2026-10-12)). The live trial runs on this registry.
+
+| Contract | Address | Notes |
+|---|---|---|
+| ProjectRegistry | [`0xfe4470a42df0e77f7efb1b2e8135134a9cd7d102`](https://sepolia.etherscan.io/address/0xfe4470a42df0e77f7efb1b2e8135134a9cd7d102) | Stacker `0x0457…314d`, fee `ORACLE_FEE()` 0.5 test IMD of `0x44a1…f89a` (read live from Intake v2), challenge bond 5 test IMD, cooldown 1 hour, panel 15/11, 1-day expiry, beneficiary handoff at most once per day, owed bonds claimed with `claimBond(to)`. Challenges use `challengeForBeneficiary(project, reason, expectedBeneficiary)`. |
+
 ### Ethereum mainnet (next)
 
 | Contract | Address | Notes |
