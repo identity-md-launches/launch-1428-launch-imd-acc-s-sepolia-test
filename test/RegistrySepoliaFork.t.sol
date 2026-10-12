@@ -19,8 +19,9 @@ interface ITestIMD {
 contract RegistrySepoliaForkTest is Test {
     address internal constant INTAKE = 0xa43e6F75ee006411F79Ac1C84120606C2330DE82;
     address internal constant ORACLE_IMD = 0x44a1Cd38474FB1748400E7DEb5F8D786ccE3F89A;
-    address internal constant PLEA_HOOK = 0x3d4CcAc329010b8beA3b14498d9a45EAB00c68Cc;
-    address internal constant STACKER_V1 = 0x293C7134Ab8f6Bf1D8fF44Ed806575f8F1bAF477;
+    address internal constant PLEA_HOOK = 0x2d5A03d5bAb98a4a435edad11813373963bcA8cC;
+    /// @dev Test run 2's live Stacker (launch #1294), also used by test run 5's registry.
+    address internal constant LIVE_STACKER = 0x0457276D7b036818B3EddC1A4A3FCeda61e9314d;
     uint256 internal constant KEY = 0xA11CE;
 
     ProjectRegistry internal reg;
@@ -34,7 +35,7 @@ contract RegistrySepoliaForkTest is Test {
         vm.createSelectFork(rpc);
         if (block.chainid != 11_155_111) return;
         forked = true;
-        reg = new ProjectRegistry(INTAKE, ORACLE_IMD, STACKER_V1, vm.addr(KEY), 1, 5e18, 1 hours);
+        reg = new ProjectRegistry(INTAKE, ORACLE_IMD, LIVE_STACKER, vm.addr(KEY), 1, 5e18, 1 hours);
         ITestIMD(ORACLE_IMD).mint(applicant, 10e18);
         vm.prank(applicant);
         ITestIMD(ORACLE_IMD).approve(address(reg), type(uint256).max);
@@ -45,7 +46,25 @@ contract RegistrySepoliaForkTest is Test {
         _;
     }
 
+    /// @dev Runs offline too: a skipped fork must not hide drift from this launch's targets.
+    function test_rehearsalTargetsMatchTestRun5() public view {
+        string memory manifest = vm.readFile("./launch.json");
+        assertEq(vm.parseJsonString(manifest, ".contracts[0].contract"), "ProjectRegistry");
+        assertFalse(vm.keyExistsJson(manifest, ".contracts[1]"), "registry only");
+        string[] memory args = vm.parseJsonStringArray(manifest, ".contracts[0].constructorArgs");
+        assertEq(INTAKE, vm.parseAddress(args[0]));
+        assertEq(ORACLE_IMD, vm.parseAddress(args[1]));
+        assertEq(LIVE_STACKER, vm.parseAddress(args[2]), "rehearse the manifest's live Stacker");
+        assertEq(
+            PLEA_HOOK,
+            vm.parseAddress("0x2d5a03d5bab98a4a435edad11813373963bca8cc"),
+            "rehearse PLEA's current hook"
+        );
+    }
+
     function test_sepolia_applyPaysTheRealIntake_thenAnswerLists() public onlyFork {
+        assertGt(LIVE_STACKER.code.length, 0, "the existing Stacker is live");
+        assertEq(reg.projectOwner(PLEA_HOOK), applicant, "apply as the current hook's owner");
         uint256 before_ = ITestIMD(ORACLE_IMD).balanceOf(applicant);
         vm.recordLogs();
         vm.prank(applicant);
@@ -78,8 +97,22 @@ contract RegistrySepoliaForkTest is Test {
                     abi.decode(logs[i].data, (bytes, address, bytes4, address, uint256));
                 assertEq(vm.parseJsonString(string(body), ".answerType"), "bool");
                 assertEq(vm.parseJsonUint(string(body), ".chainId"), 1);
+                assertEq(vm.parseJsonUint(string(body), ".consumer.chainId"), 11_155_111);
                 assertEq(
                     vm.parseJsonAddress(string(body), ".consumer.verifyingContract"), address(reg)
+                );
+                string memory question = vm.parseJsonString(string(body), ".question");
+                assertTrue(
+                    vm.contains(
+                        question,
+                        "Stacker 0x0457276d7b036818b3eddc1a4a3fceda61e9314d on chain 11155111"
+                    )
+                );
+                assertTrue(
+                    vm.contains(
+                        question,
+                        "contract 0x2d5a03d5bab98a4a435edad11813373963bca8cc on chain 11155111"
+                    )
                 );
                 sawRequested = true;
             }

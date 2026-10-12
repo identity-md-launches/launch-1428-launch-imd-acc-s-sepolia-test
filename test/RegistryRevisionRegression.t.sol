@@ -401,18 +401,45 @@ contract RegistryRevisionRegressionTest is RegistryBase {
         assertEq(vm.parseJsonAddress(body, ".consumer.verifyingContract"), address(reg));
     }
 
-    // Retained limit: anyone can buy the one slot. A defense no longer renews immunity.
+    /// @dev Imported audit 2ecbe6a1: the single slot has no fairness guarantee. Preserve the
+    /// brief's permissionless challenges and bond destination; document this limit in design.md.
     function test_selfChallengeOccupiesSlotOnlyUntilItSettles() public {
         _listed();
         _fund(beneficiary);
-        vm.warp(block.timestamp + COOLDOWN);
-        vm.prank(beneficiary);
-        bytes32 id = reg.challengeForBeneficiary(project, "routine check", beneficiary);
+        uint64 openAt = reg.projectOf(project).challengeOpenAt;
+        uint256 beforeBeneficiary = imd.balanceOf(beneficiary);
+        uint256 beforeChallenger = imd.balanceOf(challenger);
+        uint256 fee = reg.ORACLE_FEE();
+        assertEq(fee, 0.5e18);
+        vm.warp(openAt);
+
+        for (uint256 i; i < 3; ++i) {
+            // Model the beneficiary winning transaction ordering again after settlement.
+            vm.prank(beneficiary);
+            bytes32 id = reg.challengeForBeneficiary(project, "routine check", beneficiary);
+            assertEq(reg.projectOf(project).asker, beneficiary);
+            assertEq(imd.balanceOf(address(reg)), BOND);
+            uint256 requestsBefore = intake.count();
+            vm.prank(challenger);
+            vm.expectRevert(ProjectRegistry.AskOpen.selector);
+            reg.challengeForBeneficiary(project, "It credits outside trades.", beneficiary);
+            assertEq(intake.count(), requestsBefore, "outsider did not file a question");
+            assertEq(imd.balanceOf(challenger), beforeChallenger, "rejected before payment");
+
+            vm.warp(block.timestamp + 5 minutes);
+            vm.roll(block.number + 1);
+            assertTrue(_answer(id, true));
+            assertTrue(reg.isListed(project));
+            assertEq(reg.projectOf(project).challengeOpenAt, openAt, "no fresh cooldown");
+            assertEq(uint8(reg.projectOf(project).ask), uint8(ProjectRegistry.Ask.None));
+            assertEq(imd.balanceOf(address(reg)), 0, "bond returned to beneficiary");
+            assertEq(beforeBeneficiary - imd.balanceOf(beneficiary), (i + 1) * fee);
+        }
+
+        // If the outsider's transaction is included first, its reason is accepted immediately.
         vm.prank(challenger);
-        vm.expectRevert(ProjectRegistry.AskOpen.selector);
         reg.challengeForBeneficiary(project, "It credits outside trades.", beneficiary);
-        assertTrue(_answer(id, true));
-        vm.prank(challenger);
-        reg.challengeForBeneficiary(project, "It credits outside trades.", beneficiary);
+        assertEq(reg.projectOf(project).asker, challenger);
+        assertEq(beforeChallenger - imd.balanceOf(challenger), fee + BOND);
     }
 }

@@ -113,6 +113,12 @@ The registry `main` will use on mainnet, now with owed bonds (a bond the token r
 |---|---|---|
 | ProjectRegistry | [`0xfe4470a42df0e77f7efb1b2e8135134a9cd7d102`](https://sepolia.etherscan.io/address/0xfe4470a42df0e77f7efb1b2e8135134a9cd7d102) | Stacker `0x0457…314d`, fee `ORACLE_FEE()` 0.5 test IMD of `0x44a1…f89a` (read live from Intake v2), challenge bond 5 test IMD, cooldown 1 hour, panel 15/11, 1-day expiry, beneficiary handoff at most once per day, owed bonds claimed with `claimBond(to)`. Challenges use `challengeForBeneficiary(project, reason, expectedBeneficiary)`. |
 
+### Sepolia test run 5 (prepared for deployment)
+
+This branch's `launch.json` deploys only the `ProjectRegistry`, wired to test run 2's live Stacker and IdentityMD Intake v2. It keeps test run 4's registry behavior with version 3 of the panel rules and owner-only applications, a 5 test-IMD challenge bond and a 1-hour cooldown. No Stacker or token is redeployed. See [ADAPTATION.md](ADAPTATION.md) for the launch checks and audit dispositions, including the [single challenge-slot limit](docs/design.md#known-limits).
+
+The launch service's confirmed registry address and block belong in a **Sepolia test run 5** deployment table here once it is live. No test run 5 address or live panel result is recorded yet; the live applications, listing and challenge remain the post-deployment trial.
+
 ### Ethereum mainnet (live, launch #1409, block 26,176,629)
 
 | Contract | Address | Notes |
@@ -212,7 +218,7 @@ test/                     Foundry tests: unit, edge cases, fuzz, invariants, dep
   mocks/                  TestIMD, TestSIMD (a copy of StakedIMD), a mock Intake: test doubles only
   trial/                  SelfCredit: the registry trial's negative case (Sepolia only, never listed)
 lib/                      forge-std, OpenZeppelin and Solady files, vendored
-launch.json               the IMD launch manifest: one Stacker, mainnet IMD and sIMD
+launch.json               this branch's IMD launch manifest: only ProjectRegistry, Sepolia test run 5
 foundry.toml              solc 0.8.26, cancun, 10,000 optimizer runs, bytecode_hash none
 docs/
   listing.md              how a project gets listed: steps, checklist, fee guard, delisting
@@ -246,7 +252,7 @@ With [Foundry](https://getfoundry.sh) 1.8.3, the version IMD's verifier runs:
 
 ```
 forge build
-forge test                                                        # 225 tests; the 11 fork tests skip
+forge test                                                        # offline suite; 11 fork tests and 2 mainnet-manifest checks skip
 ETH_RPC_URL=https://ethereum-rpc.publicnode.com forge test --mc MainnetFork            # live IMD and sIMD
 SEPOLIA_RPC_URL=https://ethereum-sepolia-rpc.publicnode.com forge test --mc SepoliaFork # live TestIMD and TestSIMD; RegistrySepoliaFork: the real Intake v2
 forge fmt --check src test
@@ -254,7 +260,7 @@ forge fmt --check src test
 
 The mainnet fork tests check the live vault's facts (asset, renounced owner, not paused), a credit to a new and a repeat trader, and the one-block hold followed by a redeem. The Sepolia ones check a credit, its event and totals, and that a paused vault makes `credit` revert without moving anything; the registry's fork test sends a real application to Intake v2 and settles it.
 
-**Branches:** `main` holds the mainnet manifest (the Stacker only). The `sepolia` branch differs only in `launch.json`: the same Stacker wired to the live Sepolia TestIMD and TestSIMD, plus the ProjectRegistry.
+**Branches:** `main` holds the mainnet manifest (the Stacker only). This `launch-sepolia` submission prepares test run 5 from `sepolia` without GitHub workflows: its manifest deploys only the ProjectRegistry and reuses test run 2's live Stacker and the existing test tokens.
 
 **Working with IMD:** jobs are paid in IMD (0.5 IMD each) from the owner's wallet. Run the free `POST https://api.imd.fun/requests/check` before paying. Set hosting only with the job's `ipfs` field, never in the prompt text, or the agent tries to publish the site itself and blocks. Docs: https://imd.fun/docs.
 
