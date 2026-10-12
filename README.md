@@ -4,8 +4,8 @@
 
 | | |
 |---|---|
-| **Status** | Sepolia test run 2 live (launch #1294): the new Stacker and the on-chain ProjectRegistry. Registry trial under way: PLEA's two applications split the oracle panel (no answer), and the negative case was rejected with a signed answer ([history, section 17](docs/history.md#17-registry-trial-pleas-first-applications-2026-10-12)). Then mainnet. |
-| **Test site** | https://imd-acc-sepolia-test-run-2.sites.imd.fun/ (test run 2: Home, Stack, Projects, Apply, Leaderboard, Docs; the first run's page: https://imd-acc-sepolia-test-run.site.identitymd.eth.limo) |
+| **Status** | Sepolia live: the Stacker (test run 2, launch #1294) and the ProjectRegistry the mainnet one will use (test run 4, launch #1378). Live listing trial done on 2026-10-12: PLEA listed by a signed yes (11 of 12) and then defended against a challenge (11 of 11, bond to its beneficiary); the negative case rejected 12 to 0 ([history, section 29](docs/history.md#29-live-listing-trial-on-the-test-run-4-registry-plea-listed-and-defended-2026-10-12)). Next: the mainnet Stacker. |
+| **Website** | https://khaed1.github.io/imd-acc/ (from this repository: live Sepolia data, real wallet transactions on test run 4, docs). Older IMD-hosted pages show older registries: https://imd-acc-sepolia-test-run-2.sites.imd.fun/ (test run 2) and https://imd-acc-sepolia-test-run.site.identitymd.eth.limo (the first run). |
 | **Contract code** | [`src/Stacker.sol`](src/Stacker.sol) (the cashback funnel) and [`src/ProjectRegistry.sol`](src/ProjectRegistry.sol) (the oracle-decided project list) in this repository. The first Sepolia launch's code, built and deployed by the [IMD swarm](https://imd.fun), is in the [launch-1129 repository](https://github.com/identity-md-launches/launch-1129-build-imd-acc-sepolia-test). |
 
 ## Contents
@@ -106,7 +106,7 @@ The test run 2 site still reads test run 2's registry.
 
 ### Sepolia test run 4 (live, launch #1378, block 11,897,725)
 
-The registry `main` will use on mainnet, now with owed bonds (a bond the token refuses to pay never holds a question open; its recipient takes it with `claimBond(to)`), with Sepolia settings, wired to test run 2's Stacker above. Code: [launch-1378 repository](https://github.com/identity-md-launches/launch-1378-launch-imd-acc-s-fourth-last), commit `666e7b63`; its `src/` is byte for byte `main`'s ([history, section 26](docs/history.md#26-sepolia-test-run-4-live-launch-1378-2026-10-12)). The live trial runs on this registry.
+The registry `main` will use on mainnet, now with owed bonds (a bond the token refuses to pay never holds a question open; its recipient takes it with `claimBond(to)`), with Sepolia settings, wired to test run 2's Stacker above. Code: [launch-1378 repository](https://github.com/identity-md-launches/launch-1378-launch-imd-acc-s-fourth-last), commit `666e7b63`; its `src/` is byte for byte `main`'s ([history, section 26](docs/history.md#26-sepolia-test-run-4-live-launch-1378-2026-10-12)). Source verified on Sourcify (full match). The live trial ran on this registry: PLEA is listed from block 11,898,188 and was defended against a challenge; SelfCredit was rejected ([history, section 29](docs/history.md#29-live-listing-trial-on-the-test-run-4-registry-plea-listed-and-defended-2026-10-12)).
 
 | Contract | Address | Notes |
 |---|---|---|
@@ -145,7 +145,7 @@ The all-traders dashboard and leaderboards (top traders, top projects, 7-day and
 | Project | Status |
 |---|---|
 | PLEA v10 (hook `0x3d4C…68Cc`, first Stacker) | Not listed. Its listing job for the first test page ([`jobs/3-list-plea.md`](jobs/3-list-plea.md)) is no longer needed, since test run 2 replaces that page. |
-| PLEA, next version (hook `0x2d5a…a8cc`, Stacker of test run 2) | Applied twice to the Sepolia ProjectRegistry at 50 bps on 2026-10-12; both panels split (8 and 9 of 13 said yes, 11 needed), so it isn't listed yet. Its credits show as direct, no points. |
+| PLEA, next version (hook `0x2d5a…a8cc`, Stacker of test run 2) | **Listed** on the test run 4 registry at 50 bps from block 11,898,188 (2026-10-12, signed yes 11 of 12), and defended against a challenge (11 of 11). Its credits from that block earn points. (On test run 2's registry, with the version 1 rules, its two applications split the panel.) |
 
 ## Integrating a project
 
@@ -182,7 +182,7 @@ Rules:
 
 | Project | Chain | Status |
 |---|---|---|
-| **PLEA**: a sell-gated meme token on Uniswap v4 | Ethereum (Sepolia first) | **Live on Sepolia.** Its v10 hook credits 0.5% (its rate) of every PLEA/IMD trade inside the same swap, for buys and sells; new and repeat traders were stacked. PLEA mainnet will use the mainnet Stacker. |
+| **PLEA**: a sell-gated meme token on Uniswap v4 | Ethereum (Sepolia first) | **Live on Sepolia, listed.** Its hook credits 0.5% (its rate) of every PLEA/IMD trade inside the same swap, for buys and sells; its current hook `0x2d5a…a8cc` is listed on the test run 4 registry, so its credits earn points. PLEA mainnet will use the mainnet Stacker. |
 | **PondPad**: an IMD-paired launchpad | Robinhood Chain | Planned. The sIMD vault is on Ethereum only, so PondPad uses the [multichain route](docs/design.md#multichain-cashback-from-other-chains): cashback waits on Robinhood Chain and is delivered to Ethereum as sIMD through IMD's own bridge. |
 
 ## Roadmap
