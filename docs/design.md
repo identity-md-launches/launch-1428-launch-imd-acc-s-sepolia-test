@@ -211,6 +211,18 @@ The only way out is to the StackReceiver, whose address is fixed at deploy. The 
 
 **Accepted trade-offs:** the trader's sIMD lands on Ethereum, not on their own chain; delivery waits for the next flush; and it relies on LayerZero and IMD's bridge setup. A later step could send bridged sIMD back to the trader's own chain, or use local vaults if the IMD team deploys sIMD on other chains (worth asking them).
 
+
+### Listing on other chains
+
+**One registry per chain** (decided 2026-10-11), with the same contract code. A project applies on the chain where it trades, through the same Apply page with a chain picker; the wallet switches to that chain.
+
+- **Fees and bonds in that chain's IMD.** The Intake sells oracle answers on Ethereum, Robinhood Chain and Sepolia, at 0.5 of each chain's IMD (checked 2026-10-12: IMD's capabilities list Robinhood Chain's asset as IMD `0x5f7b…7127`, and the Robinhood Intake's `priceOf` returns 0.5 IMD). So on Robinhood Chain the applicant pays the oracle fee, and a challenger posts the bond, in Robinhood IMD: the same token over IMD's own LayerZero bridge. Jobs and launches (deploying a registry or a RemoteStacker) are still paid in IMD on Ethereum; IMD doesn't sell them on other chains yet.
+- **A Robinhood Chain registry** takes the Intake at the same address, `oracleAsset` = Robinhood IMD, `stacker` = the RemoteStacker on Robinhood Chain (so the RemoteStacker deploys first), and `questionChainId` = 4663: the oracle reads Robinhood Chain (IMD's free check accepted a question about a 4663 contract and judged it answerable). Bond and cooldown are the owner's call; recommendation: mainnet's 20 IMD and 7 days. Check the Intake's callback gas on Robinhood Chain before the launch (200k on Ethereum, 1M on Sepolia).
+- **No code change for the question.** It names the chain (`block.chainid`) and the Stacker it was deployed with. One wording point: it says cashback is paid "as staked IMD through the Stacker", while on Robinhood Chain it waits in the RemoteStacker and reaches the trader as sIMD on Ethereum. Rehearse one question there before relying on it, as with the version 2 rules.
+- **Points** for such a project come from the RemoteStacker's `Queued` events on its chain, inside the listing periods of that chain's registry (in that chain's blocks). The dashboard adds each trader's points across chains (the same address on every chain, except smart-contract wallets: rule 7 above).
+- **Base and Arbitrum:** the oracle reads them (and BNB Chain), but there is no Intake there and IMD can't launch there yet, so no registry or RemoteStacker for now. Recommendation: wait until IMD supports them. The alternative, an Ethereum registry that also takes applications for projects on other chains, needs a code change (the project's chain in each record and question) and its own rehearsal.
+- **Order:** RemoteStacker and StackReceiver built, tested and launched → the Robinhood Chain registry launched → one rehearsed question → PondPad applies.
+
 ## Who pays the gas
 
 - **On Ethereum:** the trader, inside their own swap. The project pays no extra gas, and imd/acc has no treasury or relayer. With the mainnet Stacker that is about 0.11M gas for a new trader and 0.075M for a repeat one, beyond the base cost of the swap: under 2¢ at today's 0.06 gwei and ETH at $2,505.
