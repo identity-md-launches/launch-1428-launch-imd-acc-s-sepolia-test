@@ -1881,6 +1881,38 @@ error ZeroShares();`;
             <p><code>onOracleResult</code> (selector <code>0x510379c7</code>) and <code>onOracleFailure</code> (<code>0xa7980e31</code>) accept calls only from the Intake. An answer counts only for the registry's own open request, signed by the oracle signer for this contract after the question was asked, from a full panel that agreed.</p>`
         },
         {
+          slug: 'data-api',
+          title: 'Data API',
+          summary: 'Read-only JSON files with every chain\'s cashback and points, for apps, wallets, bots and agents.',
+          keywords: 'api data json snapshot points leaderboard export index fetch cors version',
+          body: `
+            <p>Every chain's cashback and points, rebuilt from the chain about every 15 minutes and published with this site. No key and no server: any site or script can fetch them.</p>
+            ${docTable(['File', 'What it holds'], [
+              ['<a href="./data/v1/index.json"><code>/data/v1/index.json</code></a>', 'The chains that have a file, with each file\'s last block. Start here.'],
+              ['<a href="./data/v1/sepolia.json"><code>/data/v1/sepolia.json</code></a>', 'Sepolia: the test run 2 Stacker and the test run 4 registry.'],
+              ['<code>/data/v1/ethereum.json</code>', 'Ethereum mainnet, once the mainnet Stacker is live.']
+            ])}
+            <h2 id="rules">What the numbers mean</h2>
+            <ul>
+              <li><strong>From events only</strong>, recomputed from scratch each time: the Stacker's <code>Stacked</code> events and the registry's listing events, up to a block 12 behind the chain's head.</li>
+              <li><strong>Points:</strong> 1 per IMD stacked by a project inside one of its listing periods. A project's points are the IMD its traders stacked while it was listed.</li>
+              <li><strong>Checked</strong> against the Stacker's own totals at the same block before publishing; if a build fails, the previous file stays.</li>
+              <li><strong>Amounts are strings</strong> of whole numbers in the smallest unit (18 decimals for IMD and points, 24 for sIMD shares), so nothing loses precision.</li>
+            </ul>
+            <h2 id="fields">Main fields</h2>
+            ${docTable(['Field', 'Meaning'], [
+              ['<code>blocks.to</code>, <code>blocks.toTime</code>', 'The last block counted. Files are usually 15-30 minutes behind the chain.'],
+              ['<code>totals</code>', 'IMD, shares and points in all; credits, traders, projects, listed projects.'],
+              ['<code>projects[]</code>', 'Address, name, status (<code>listed</code>, <code>applied</code>, <code>challenged</code>, <code>rejected</code>, <code>delisted</code>, <code>cleared</code>, <code>direct</code>), rate, beneficiary, listing periods, IMD, points, traders.'],
+              ['<code>traders[]</code>', 'Address, IMD, shares, points and credits, split per project.']
+            ])}
+            ${docCode('Read a wallet\'s points', `const index = await (await fetch("https://imdacc.fun/data/v1/index.json")).json();
+const snap = await (await fetch("https://imdacc.fun/data/v1/" + index.chains[0].file)).json();
+const me = snap.traders.find((t) => t.address === wallet.toLowerCase());
+const points = me ? Number(BigInt(me.points) / 10n ** 14n) / 1e4 : 0;`, 'code-data-api')}
+            <p><strong>Stable:</strong> version 1 keeps its fields and URLs; new fields may be added. A breaking change comes as <code>/data/v2/</code>, next to v1 for a while. The full format is in <a href="https://github.com/khaed1/imd-acc/blob/main/docs/data-api.md" target="_blank" rel="noopener noreferrer">docs/data-api.md</a>.</p>`
+        },
+        {
           slug: 'gas',
           title: 'Gas & costs',
           summary: 'Measured costs of crediting, and who pays them.',
