@@ -96,6 +96,8 @@ contract ProjectRegistry is OracleAttestationConsumer, ReentrancyGuard {
     /// @notice Reject deployment inputs that could overflow the listing deadline or lock out
     /// challenges for an impractical period. The Sepolia launch uses one hour.
     uint64 public constant MAX_CHALLENGE_COOLDOWN = 365 days;
+    /// @notice Gas given to a project's `owner()` when checking who may apply for it.
+    uint256 public constant OWNER_CALL_GAS = 30_000;
     /// @notice Text limits, in bytes.
     uint256 public constant MAX_NAME = 48;
     uint256 public constant MAX_URL = 200;
@@ -188,6 +190,7 @@ contract ProjectRegistry is OracleAttestationConsumer, ReentrancyGuard {
     error HandoffTooSoon(uint64 openAt);
     error CooldownOutOfRange();
     error NothingOwed();
+    error NotProjectOwner(address owner);
 
     /// @dev Makes no external call, so the launch's empty-chain rehearsal can deploy it.
     constructor(
@@ -226,10 +229,30 @@ contract ProjectRegistry is OracleAttestationConsumer, ReentrancyGuard {
         return _projects[project].listed;
     }
 
+    /// @notice The owner `project` reports through `owner()`, or zero when it reports none (no such
+    /// function, a revert, an answer that isn't one address, or a renounced owner). Only this owner
+    /// or the project itself may apply for a project that has one.
+    /// @dev Reads at most 32 bytes of the answer with a fixed gas cap, so a project can neither
+    /// spend the applicant's gas without bound nor return more data than an address.
+    function projectOwner(address project) public view returns (address owner) {
+        bool ok;
+        uint256 size;
+        uint256 word;
+        assembly ("memory-safe") {
+            mstore(0, 0x8da5cb5b00000000000000000000000000000000000000000000000000000000) // owner()
+            ok := staticcall(OWNER_CALL_GAS, project, 0, 4, 0, 32)
+            size := returndatasize()
+            word := mload(0)
+        }
+        if (ok && size == 32 && word >> 160 == 0) owner = address(uint160(word));
+    }
+
     // ================================================================ asking
 
     /// @notice Apply for `project` to be listed at `rateBps` with `beneficiary` holding its points.
-    /// Anyone may apply; the caller pays the live oracle fee. `name` is 1-48 bytes and `sourceUrl`
+    /// When the project reports an owner (`projectOwner`), only that owner or the project itself may
+    /// apply, so nobody else can hold its one question slot; a project without one can be applied
+    /// for by anyone. The caller pays the live oracle fee. `name` is 1-48 bytes and `sourceUrl`
     /// an https URL of at most 200 bytes, both printable ASCII without quotes, backslashes or
     /// square brackets. They go into the panel's question as untrusted text.
     function applyListing(
@@ -243,6 +266,10 @@ contract ProjectRegistry is OracleAttestationConsumer, ReentrancyGuard {
             revert ZeroAddress();
         }
         if (project.code.length == 0) revert NotAContract();
+        address owner_ = projectOwner(project);
+        if (owner_ != address(0) && msg.sender != owner_ && msg.sender != project) {
+            revert NotProjectOwner(owner_);
+        }
         if (rateBps < MIN_RATE_BPS || rateBps > MAX_RATE_BPS) revert RateOutOfRange(rateBps);
         _checkText(bytes(name), 1, MAX_NAME);
         _checkText(bytes(sourceUrl), 12, MAX_URL);
@@ -533,12 +560,12 @@ contract ProjectRegistry is OracleAttestationConsumer, ReentrancyGuard {
             '"trading":"',
             p,
             " is a trading venue (for example a Uniswap v4 hook, a pool or a launchpad). Every call it can make to credit(trader, amount) on the Stacker happens while executing a trade, for the trader of that trade, with IMD from the fees of that trade. A wallet, an unverified contract, or a contract that can call credit outside a trade, for wallets it picks, or with IMD that is not from the trade fails this rule.",
-            '","trader":"The project never chooses who is credited. The trader may be the address the swap caller passes in hookData, as routers do, with the swap sender as the fallback; that address counts as the trader of that trade.","otherPayouts":"Cashback that is not credited through the Stacker is allowed and simply earns no points: for example plain IMD paid when credit reverts, or a payout in another form when crediting is not possible. Such payouts never break the trading or rate rules."'
+            '","trader":"The project never chooses who is credited. Resolve valid router hookData first, else IMsgSender(sender).msgSender() during the swap, else sender only if sender has no code; never tx.origin. Reject zero, Stacker, IMD, vault and forwarding-router recipients. If data is invalid, pay plain IMD to a valid resolved caller. If credit fails, pay its resolved trader plain IMD. Never pay an unresolved router: unsupported routes must supply trader data before cashback is enabled.","otherPayouts":"Cashback that is not credited through the Stacker is allowed and simply earns no points: for example plain IMD paid when credit reverts, or a payout in another form when crediting is not possible. Such payouts never break the trading or rate rules."'
         );
         string memory fees = string.concat(
             ',"rate":"',
             rate,
-            '","feeGuard":"Split the trading fee into three parts: the cashback; the parts that come back to the owner or team (owner share, treasury, liquidity or reserves the owner or team can withdraw); and the parts that leave for good (burned tokens, prizes paid to others, fees to third parties, locked value as in lockedValue). The parts that leave for good must add up to at least the cashback. If the rate or the fee split can change, the code must keep this true for every allowed setting.","lockedValue":"Liquidity or reserves that no owner or team wallet can ever withdraw count as leaving for good, even if the contract itself can move them between its own positions or pools."'
+            '","feeGuard":"Split each trading fee into cashback, owner/team returns (including withdrawable reserves), and qualifying outflow (burns, prizes to others, third-party payments, locked value as in lockedValue). Qualifying outflow must be at least the cashback for every allowed setting of rate and fee split. LP fees do not count: the trader may also be the LP. Amounts returned to the trader, owner or team do not qualify.","lockedValue":"Liquidity or reserves that no owner or team wallet can ever withdraw count as leaving for good, even if the contract itself can move them between its own positions or pools."'
         );
         return string.concat(
             trade,

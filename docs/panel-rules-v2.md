@@ -1,4 +1,4 @@
-# Panel rules, version 2 (draft for the mainnet registry)
+# Panel rules, versions 2 and 3
 
 The rules (`definitions`) the IdentityMD oracle panel reads when it judges a listing. Version 1 is what the deployed Sepolia ProjectRegistry sends; it is fixed in that contract's code. Version 2 says the same things more plainly, after PLEA's two Sepolia applications split the panel ([history, section 17](history.md#17-registry-trial-pleas-first-applications-2026-10-12)). It was rehearsed once on Sepolia and reached a signed answer ([history, section 18](history.md#18-clearer-panel-rules-rehearsed-2026-10-12)).
 
@@ -42,3 +42,19 @@ For a challenge, `rate` keeps version 1's challenge form (the rate in force must
 | Version 2 (challenge form), live challenge | 11 | 0 | **signed yes: defended** |
 
 With version 2 no member raised the trading, trader, rate or evidence rules. The two "no" answers were about PLEA's own fee split: its owner can enter and win Seasons prizes, and a public `rebalance()` pays a 0.01 IMD keeper tip from the hook's retained IMD to whoever calls it. The margin was exactly the quorum, so one rehearsal is not proof that every panel will agree. The live application on test run 4 again reached exactly 11 yes; its one no was the same keeper tip. The live challenge was unanimous (11 of 11).
+
+## Version 3 (draft for the mainnet registry, 2026-10-12)
+
+Two rules change, both from IMD's audit of the mainnet Stacker launch (#1409, [history section 33](history.md#33-mainnet-stacker-live-launch-1409-2026-10-12)), with the owner's approval; the other six stay as in version 2. Wording as IMD's builder wrote it and its judge accepted; each under 512 characters (473 and 408). Not rehearsed with a panel yet: the next Sepolia run's live trial does that.
+
+| Key | Rule |
+|---|---|
+| `trader` | The project never chooses who is credited. Resolve valid router hookData first, else IMsgSender(sender).msgSender() during the swap, else sender only if sender has no code; never tx.origin. Reject zero, Stacker, IMD, vault and forwarding-router recipients. If data is invalid, pay plain IMD to a valid resolved caller. If credit fails, pay its resolved trader plain IMD. Never pay an unresolved router: unsupported routes must supply trader data before cashback is enabled. |
+| `feeGuard` | Split each trading fee into cashback, owner/team returns (including withdrawable reserves), and qualifying outflow (burns, prizes to others, third-party payments, locked value as in lockedValue). Qualifying outflow must be at least the cashback for every allowed setting of rate and fee split. LP fees do not count: the trader may also be the LP. Amounts returned to the trader, owner or team do not qualify. |
+
+| Version 2 said | The gap | Version 3 |
+|---|---|---|
+| the trader may come from `hookData`, "with the swap sender as the fallback" | in a Uniswap v4 hook the swap sender is usually the router: a swap from the Uniswap app (no `hookData`) would credit the router, whose `sweep` anyone can call, so bots take the cashback and the points land on the router | `hookData`, else the router's `msgSender()`, else `sender` only if it has no code; never pay an unresolved router |
+| LP fees could count as leaving for good | a trader who also provides most of the pool's liquidity gets most of the LP fee back, so 1% cashback against a 1% LP fee is nearly free points | LP fees, and anything returned to the trader, owner or team, don't count |
+
+**Effect on PLEA:** its fee split still passes (its 0.75% that leaves is locked liquidity, burns and prizes, not LP fees). Its Sepolia hook takes the trader from `hookData` and requires it for buys, but falls back to `sender` for sells, which version 3 refuses when the sender is a router; its next hook should ask the router's `msgSender()` or skip the cashback instead.
