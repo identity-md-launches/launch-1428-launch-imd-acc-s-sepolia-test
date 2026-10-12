@@ -288,7 +288,7 @@ Known and harmless: a credit mints sIMD to the trader, and the vault's one-block
 | `references` | `evm-contracts-launch`, `defi-native`, `eth-security`, `eth-testing`, `eth-frontend-ux`, `better-interface`, `pashov-skill`, `solidity-security-review` |
 | Prompt | [`jobs/1-sepolia-launch.md`](../jobs/1-sepolia-launch.md) |
 
-### Ethereum mainnet (ready, not paid)
+### Ethereum mainnet (live, launch #1409)
 
 | Field | Value |
 |---|---|
