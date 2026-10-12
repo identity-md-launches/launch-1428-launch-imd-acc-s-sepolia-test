@@ -52,7 +52,7 @@ The question names the Stacker, the project, the chain and the registry, the sta
 - **beneficiary:** the project's owner, or a wallet its verified source or official website names as its team or treasury. This stops someone from applying for another team's project with their own wallet as beneficiary;
 - **evidence:** the verified source on the chain's explorer; unverified code means false.
 
-**Version 2 (2026-10-12, in `src/ProjectRegistry.sol` on `main`; the deployed Sepolia registry still sends version 1):** after PLEA's applications split the panel, clearer rules were written and rehearsed (11 of 13 yes, signed): [panel-rules-v2.md](panel-rules-v2.md). They add that a plain-IMD fallback or other uncredited payout is allowed and earns no points, that the trader may come from the swap caller's `hookData`, that value no owner or team wallet can ever withdraw leaves for good, and that Etherscan, Blockscout or Sourcify count as verified source. Each rule must stay under 512 characters.
+**Version 2 (2026-10-12, in `src/ProjectRegistry.sol` on `main`, and live in Sepolia test runs 3 and 4; test run 2's registry still sends version 1):** after PLEA's applications split the panel, clearer rules were written and rehearsed (11 of 13 yes, signed): [panel-rules-v2.md](panel-rules-v2.md). They add that a plain-IMD fallback or other uncredited payout is allowed and earns no points, that the trader may come from the swap caller's `hookData`, that value no owner or team wallet can ever withdraw leaves for good, and that Etherscan, Blockscout or Sourcify count as verified source. Each rule must stay under 512 characters.
 
 A challenge asks whether the listed project still meets all of them, with the challenger's reason as untrusted text. Panel: 15 seats, 11 must agree. IMD's free check accepted this question (no blockers, judged answerable).
 
@@ -101,6 +101,8 @@ Confirmed by the owner on 2026-10-11, for both chains.
 6. The test page shows the registry's state and counts points by its listing periods.
 
 **Results so far (2026-10-12, [history section 17](history.md#17-registry-trial-pleas-first-applications-2026-10-12)):** PLEA applied twice and both panels split (8 and 9 of 13 yes, 11 needed), so both were cleared as no-answer cases; the false answers read the plain-IMD fallback, a claims payout that skips the Stacker and the trader from `hookData` as breaking the trading rule. The negative case `SelfCredit` was rejected 12 to 0 with a signed answer. The listing and challenge steps wait for a listed project.
+
+**Live trial on test run 4 (2026-10-12, [history section 29](history.md#29-live-listing-trial-on-the-test-run-4-registry-plea-listed-and-defended-2026-10-12)), with the version 2 rules:** PLEA applied through the website and was **listed by a signed yes** (11 of 12, block 11,898,188); `SelfCredit` was rejected 12 to 0; after the 1-hour cooldown a challenge against PLEA was **defended** (11 of 11): the bond went to its beneficiary and the cooldown wasn't restarted. Steps 2, 3 and 5 above are done live; a delisting by a signed no was shown on a fork only.
 
 ## Points now, token maybe later
 
