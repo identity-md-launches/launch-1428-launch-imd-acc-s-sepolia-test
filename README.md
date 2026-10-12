@@ -5,7 +5,7 @@
 | | |
 |---|---|
 | **Status** | Sepolia live: the Stacker (test run 2, launch #1294) and the ProjectRegistry the mainnet one will use (test run 4, launch #1378). Live listing trial done on 2026-10-12: PLEA listed by a signed yes (11 of 12) and then defended against a challenge (11 of 11, bond to its beneficiary); the negative case rejected 12 to 0 ([history, section 29](docs/history.md#29-live-listing-trial-on-the-test-run-4-registry-plea-listed-and-defended-2026-10-12)). Next: the mainnet Stacker. |
-| **Website** | https://khaed1.github.io/imd-acc/ (from this repository: live Sepolia data, real wallet transactions on test run 4, docs). Older IMD-hosted pages show older registries: https://imd-acc-sepolia-test-run-2.sites.imd.fun/ (test run 2) and https://imd-acc-sepolia-test-run.site.identitymd.eth.limo (the first run). |
+| **Website** | https://imdacc.fun (GitHub Pages from this repository; the old https://khaed1.github.io/imd-acc/ redirects there: live Sepolia data, real wallet transactions on test run 4, docs). Older IMD-hosted pages show older registries: https://imd-acc-sepolia-test-run-2.sites.imd.fun/ (test run 2) and https://imd-acc-sepolia-test-run.site.identitymd.eth.limo (the first run). |
 | **Contract code** | [`src/Stacker.sol`](src/Stacker.sol) (the cashback funnel) and [`src/ProjectRegistry.sol`](src/ProjectRegistry.sol) (the oracle-decided project list) in this repository. The first Sepolia launch's code, built and deployed by the [IMD swarm](https://imd.fun), is in the [launch-1129 repository](https://github.com/identity-md-launches/launch-1129-build-imd-acc-sepolia-test). |
 
 ## Contents
